@@ -5,7 +5,7 @@ description: "如何使用此博客模板"
 image: "./cover.jpeg"
 tags: ["博客"]
 category: 指南
-draft: true
+draft: false
 ---
 
 ## 文章的前置参数 (Front-matter)
