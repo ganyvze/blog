@@ -3,13 +3,16 @@
 </section>
 
 <script is:inline>
+    // 封装：获取当前博客应该对应的 Giscus 主题
+    function getGiscusTheme() {
+        const theme = document.documentElement.getAttribute('data-theme') || 
+                     (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        return theme === 'dark' ? 'transparent_dark' : 'light';
+    }
+
     function loadGiscus() {
         const container = document.getElementById('giscus-container');
         if (!container) return;
-
-        // 获取当前主题
-        const theme = document.documentElement.dataset.theme || 'light';
-        const giscusTheme = theme === 'dark' ? 'transparent_dark' : 'light';
 
         // 创建 script 标签
         const script = document.createElement('script');
@@ -23,39 +26,49 @@
         script.setAttribute('data-reactions-enabled', '1');
         script.setAttribute('data-emit-metadata', '0');
         script.setAttribute('data-input-position', 'bottom');
-        script.setAttribute('data-theme', giscusTheme);
+        script.setAttribute('data-theme', getGiscusTheme()); // 初始加载时获取正确主题
         script.setAttribute('data-lang', 'zh-CN');
         script.setAttribute('data-loading', 'lazy');
         script.setAttribute('crossorigin', 'anonymous');
         script.async = true;
 
-        // 清空容器并注入
         container.innerHTML = '';
         container.appendChild(script);
     }
 
-    // 响应深色模式切换
+    // 发送消息给 Giscus iframe 实时切换主题
     function updateGiscusTheme() {
-        const theme = document.documentElement.dataset.theme || 'light';
-        const giscusTheme = theme === 'dark' ? 'transparent_dark' : 'light';
         const iframe = document.querySelector('iframe.giscus-frame');
-        if (iframe) {
-            iframe.contentWindow.postMessage(
-                { giscus: { setConfig: { theme: giscusTheme } } },
-                'https://giscus.app'
-            );
-        }
+        if (!iframe) return;
+
+        iframe.contentWindow.postMessage(
+            { giscus: { setConfig: { theme: getGiscusTheme() } } },
+            'https://giscus.app'
+        );
     }
 
-    // 1. 初次加载
+    // 初始化加载
     loadGiscus();
 
-    // 2. 监听 Astro 的视图切换事件（关键：应对无刷新跳转）
-    document.addEventListener('astro:after-swap', () => {
-        loadGiscus();
+    // 监听 Astro 页面跳转（处理开启了 View Transitions 的情况）
+    document.addEventListener('astro:page-load', () => {
+        if (!document.querySelector('iframe.giscus-frame')) {
+            loadGiscus();
+        }
     });
 
-    // 3. 监听主题变化
-    const observer = new MutationObserver(updateGiscusTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    // 监听主题变化：同时监听 class 和 data-theme
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && 
+               (mutation.attributeName === 'data-theme' || mutation.attributeName === 'class')) {
+                updateGiscusTheme();
+            }
+        });
+    });
+
+    observer.observe(document.documentElement, { 
+        attributes: true, 
+        attributeFilter: ['data-theme', 'class'] 
+    });
 </script>
