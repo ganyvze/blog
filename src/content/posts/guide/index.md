@@ -1,6 +1,6 @@
 ---
 title: 创建博客指南
-published: 2026-04-11
+published: 2026-01-01
 description: "如何使用此博客模板"
 image: "./cover.jpeg"
 tags: ["博客"]
