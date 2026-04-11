@@ -1,0 +1,61 @@
+<section class="mx-auto mt-12 px-0 w-full max-w-[var(--content-width)]">
+    <div id="giscus-container"></div>
+</section>
+
+<script is:inline>
+    function loadGiscus() {
+        const container = document.getElementById('giscus-container');
+        if (!container) return;
+
+        // 获取当前主题
+        const theme = document.documentElement.dataset.theme || 'light';
+        const giscusTheme = theme === 'dark' ? 'transparent_dark' : 'light';
+
+        // 创建 script 标签
+        const script = document.createElement('script');
+        script.src = 'https://giscus.app/client.js';
+        script.setAttribute('data-repo', 'ganyvze/blog');
+        script.setAttribute('data-repo-id', 'R_kgDOR_FN1Q');
+        script.setAttribute('data-category', 'Announcements');
+        script.setAttribute('data-category-id', 'DIC_kwDOR_FN1c4C6iWC');
+        script.setAttribute('data-mapping', 'pathname');
+        script.setAttribute('data-strict', '0');
+        script.setAttribute('data-reactions-enabled', '1');
+        script.setAttribute('data-emit-metadata', '0');
+        script.setAttribute('data-input-position', 'bottom');
+        script.setAttribute('data-theme', giscusTheme);
+        script.setAttribute('data-lang', 'zh-CN');
+        script.setAttribute('data-loading', 'lazy');
+        script.setAttribute('crossorigin', 'anonymous');
+        script.async = true;
+
+        // 清空容器并注入
+        container.innerHTML = '';
+        container.appendChild(script);
+    }
+
+    // 响应深色模式切换
+    function updateGiscusTheme() {
+        const theme = document.documentElement.dataset.theme || 'light';
+        const giscusTheme = theme === 'dark' ? 'transparent_dark' : 'light';
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (iframe) {
+            iframe.contentWindow.postMessage(
+                { giscus: { setConfig: { theme: giscusTheme } } },
+                'https://giscus.app'
+            );
+        }
+    }
+
+    // 1. 初次加载
+    loadGiscus();
+
+    // 2. 监听 Astro 的视图切换事件（关键：应对无刷新跳转）
+    document.addEventListener('astro:after-swap', () => {
+        loadGiscus();
+    });
+
+    // 3. 监听主题变化
+    const observer = new MutationObserver(updateGiscusTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
