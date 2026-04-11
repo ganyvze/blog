@@ -1,7 +1,7 @@
 ---
 title: 班主任模拟器
 published: 2026-01-04
-description: "v6.0"
+description: "v6.1"
 image: "./cover.jpeg"
 tags: ["HTML"]
 category: 网页
