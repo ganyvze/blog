@@ -8,6 +8,9 @@ category: 程序
 draft: false
 ---
 
+```shell
+-std=c++14 -Wl,--stack=200000000
+```
 ```cpp
 // 局域网聊天室 - v6.1
 #include <iostream>

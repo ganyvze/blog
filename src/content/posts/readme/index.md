@@ -15,7 +15,7 @@ draft: false
 
 ---
 
-# ↓↓↓保存到自己的blog↓↓↓
+# ↓↓↓保存到自己的博客↓↓↓
 ```shell
 [班主任模拟器](https://oirush.cn/blog/997/69bbfe1604f64d77e98b1180)
 [在线版ganyvze.github.io](https://ganyvze.github.io)

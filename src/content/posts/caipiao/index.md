@@ -8,6 +8,9 @@ category: 程序
 draft: false
 ---
 
+```shell
+-std=c++14 -Wl,--stack=200000000
+```
 ```cpp
 //阎帝彩票 - v7.0
 #include <bits/stdc++.h>
