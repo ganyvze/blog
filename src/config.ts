@@ -50,8 +50,8 @@ export const navBarConfig: NavBarConfig = {
 			external: true, // Show an external link icon and will open in a new tab
 		},
 		{
-			name: "oirsh.cn",
-			url: "https://oirsh.cn",
+			name: "oirush.cn",
+			url: "https://oirush.cn",
 			external: true,
 		},
 	],
