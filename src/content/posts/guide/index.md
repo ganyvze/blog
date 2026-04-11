@@ -3,7 +3,7 @@ title: 创建博客指南
 published: 2026-04-11
 description: "如何使用此博客模板"
 image: "./cover.jpeg"
-tags: ["Fuwari", "Blogging", "Customization"]
+tags: ["博客"]
 category: 指南
 draft: false
 ---
@@ -47,7 +47,7 @@ src/content/posts/
 ---
 
 
-具体操作指南：
+## 具体操作指南：
 
 ### 一、修改或删除博文内容
 所有的文章都保存在项目的 `src/content/posts/` 目录下。
