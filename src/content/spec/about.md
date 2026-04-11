@@ -1,2 +1,2 @@
-# About
-Welcome to my blog!✨
+# 关于
+欢迎来到我的博客✨
