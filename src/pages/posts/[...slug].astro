@@ -13,6 +13,7 @@ import ImageWrapper from "../../components/misc/ImageWrapper.astro";
 import PostMetadata from "../../components/PostMeta.astro";
 import { profileConfig, siteConfig } from "../../config";
 import { formatDateToYYYYMMDD } from "../../utils/date-utils";
+import Comments from '../../components/Comments.astro';
 
 export async function getStaticPaths() {
 	const blogEntries = await getSortedPosts();
@@ -131,6 +132,11 @@ const jsonLd = {
                 <Icon name="material-symbols:chevron-right-rounded" class="text-[2rem] text-[var(--primary)]" />
             </div>}
         </a>
+    </div>
+
+    <!-- 插入评论区 -->
+    <div class="card-base p-6 mb-4 onload-animation">
+        <Comments />
     </div>
 
 </MainGridLayout>
