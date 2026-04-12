@@ -3,24 +3,18 @@
 </section>
 
 <script is:inline>
-    // 1. 核心：更可靠的主题检测函数
     function getGiscusTheme() {
-        // 优先检查 html 上的 class 或 data-theme
         const isDark = document.documentElement.classList.contains('dark') || 
                        document.documentElement.getAttribute('data-theme') === 'dark' ||
-                       localStorage.getItem('theme') === 'dark'; // 直接读取 Fuwari 的持久化存储
-        
+                       localStorage.getItem('theme') === 'dark';
         return isDark ? 'transparent_dark' : 'light';
     }
 
-    // 2. 动态加载 Giscus
     function loadGiscus() {
         const container = document.getElementById('giscus-container');
-        if (!container) return;
+        if (!container || container.querySelector('.giscus-frame')) return; // 避免重复加载
 
-        // 获取当前最新主题
         const currentTheme = getGiscusTheme();
-
         const script = document.createElement('script');
         script.src = 'https://giscus.app/client.js';
         script.setAttribute('data-repo', 'ganyvze/blog');
@@ -34,15 +28,14 @@
         script.setAttribute('data-input-position', 'bottom');
         script.setAttribute('data-theme', currentTheme);
         script.setAttribute('data-lang', 'zh-CN');
-        script.setAttribute('data-loading', 'lazy');
+        script.setAttribute('data-loading', 'eager'); // 关键修改：改为 eager 立即加载
         script.setAttribute('crossorigin', 'anonymous');
         script.async = true;
 
-        container.innerHTML = '';
+        container.innerHTML = ''; 
         container.appendChild(script);
     }
 
-    // 3. 实时发送更新消息
     function updateGiscusTheme() {
         const iframe = document.querySelector('iframe.giscus-frame');
         if (!iframe) return;
@@ -54,23 +47,23 @@
         );
     }
 
-    // --- 执行逻辑 ---
+    // --- 立即执行逻辑 ---
 
-    // 初次加载：使用 setTimeout 确保 Fuwari 的主题初始化脚本已经运行完毕
-    setTimeout(loadGiscus, 100);
-
-    // 监听跳转（Astro View Transitions）
-    document.addEventListener('astro:after-swap', () => {
+    // 1. 针对 Astro 的 View Transitions：在页面加载完成时立即运行
+    document.addEventListener('astro:page-load', () => {
         loadGiscus();
     });
 
-    // 关键改进：使用防抖的 MutationObserver，避免在切换瞬间捕获到错误状态
-    let debounceTimer;
+    // 2. 备用：如果没开启 View Transitions，确保在 DOM 解析后立即运行
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadGiscus);
+    } else {
+        loadGiscus();
+    }
+
+    // 3. 监听主题切换（保持实时响应）
     const observer = new MutationObserver((mutations) => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            updateGiscusTheme();
-        }, 200); // 延迟 200ms 等待状态稳定
+        updateGiscusTheme();
     });
 
     observer.observe(document.documentElement, { 
