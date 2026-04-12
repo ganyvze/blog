@@ -191,14 +191,13 @@ const bannerOffset =
 			pointer-events: auto; 
 		}
 
-		/* --- 谷歌 Material 纯 CSS GPU加速转圈核心动画 --- */
+		/* --- 谷歌 Material 纯 CSS 完美还原版 --- */
 		.md-spinner {
-			width: 50px;
-			height: 50px;
+			width: 60px;
+			height: 60px;
 			position: relative;
-			/* 外层匀速基础旋转 */
-			animation: md-spinner-outer 1.568s linear infinite;
-			transform: translateZ(0); /* 强制显卡加速 */
+			/* 修复点1：外层基础匀速旋转。必须与内层节奏叠加，才能产生一边转一边拉伸的错觉 */
+			animation: md-spinner-outer 1568ms linear infinite;
 			will-change: transform;
 		}
 
@@ -206,64 +205,59 @@ const bannerOffset =
 			position: absolute;
 			width: 100%;
 			height: 100%;
-			/* 周期性跳跃旋转，营造原版节奏感 */
-			animation: md-spinner-layer-rotate 5.332s cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+			/* 周期性跳跃旋转，营造“头向前伸、尾部追击”的节奏感 */
+			animation: md-spinner-layer-rotate 5332ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+			will-change: transform;
 		}
 
 		/* 左右两边的裁剪遮罩 */
 		.md-spinner-clipper {
-			position: relative;
+			position: absolute;
+			top: 0;
 			width: 50%;
 			height: 100%;
 			overflow: hidden;
 		}
 
-		.md-spinner-left {
-			float: left;
-		}
-
-		.md-spinner-right {
-			float: right;
-		}
+		.md-spinner-left { left: 0; }
+		.md-spinner-right { right: 0; }
 
 		/* 实际的彩色圆环 */
 		.md-spinner-circle {
 			box-sizing: border-box;
-			width: 50px; /* 必须要与最外层宽度保持一致，而不是 100% */
-			height: 50px;
-			/* 进度条颜色，跟随 Fuwari 主题 */
+			width: 200%; /* 保证圆环实际宽度等同于最外层宽度 */
+			height: 100%;
+			/* 进度条厚度及颜色，跟随 Fuwari 主题 */
 			border: 4px solid var(--primary, #3b82f6);
 			border-bottom-color: transparent !important;
 			border-radius: 50%;
 			position: absolute;
-			top: 0;
-			right: 0;
-			bottom: 0;
-			left: 0;
+			top: 0; right: 0; bottom: 0; left: 0;
 			will-change: transform;
 		}
 
-		/* 左侧半圆动画 */
+		/* 左侧半圆基础位置与动画 */
 		.md-spinner-left .md-spinner-circle {
+			left: 0;
 			border-right-color: transparent !important;
-			transform: rotate(129deg);
-			animation: md-spinner-left-spin 1.333s cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+			animation: md-spinner-left-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
 		}
 
-		/* 右侧半圆动画 */
+		/* 右侧半圆基础位置与动画 */
 		.md-spinner-right .md-spinner-circle {
-			left: -100%; /* 将右侧圆环拉回至与左侧对齐 */
+			left: -100%;
 			border-left-color: transparent !important;
-			transform: rotate(-129deg);
-			animation: md-spinner-right-spin 1.333s cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+			animation: md-spinner-right-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
 		}
 
-		/* 动画帧 - 经过严格的数学同步 */
+		/* 修复点2：必须显式声明每一个 0% 关键帧，防止浏览器插值失败导致卡死不转 */
 		@keyframes md-spinner-outer {
+			0%   { transform: rotate(0deg); }
 			100% { transform: rotate(360deg); }
 		}
 
 		@keyframes md-spinner-layer-rotate {
+			0%    { transform: rotate(0deg); }
 			12.5% { transform: rotate(135deg); }
 			25%   { transform: rotate(270deg); }
 			37.5% { transform: rotate(405deg); }
