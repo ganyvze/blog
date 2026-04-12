@@ -153,15 +153,15 @@
 }
 
 /* --- 性能优化部分开始 --- */
-/* 针对 Fuwari 文章主体启用，跳过非可视区域的渲染 */
-.custom-md {
+/* 1. 核心：动态预估高度 */
+#post-container {
     content-visibility: auto;
-    contain-intrinsic-size: 1000px; /* 预估高度 */
+    /* 使用 Astro 传过来的行数计算值，如果没有值则默认 2000px */
+    contain-intrinsic-size: auto var(--est-height, 2000px);
 }
 
-/* 针对长文中的代码块单独优化，防止成千上万个 span 标签阻塞渲染 */
+/* 2. 针对代码块单独优化 */
 .custom-md pre {
     content-visibility: auto;
-    contain-intrinsic-size: 300px;
+    contain-intrinsic-size: auto 300px;
 }
-/* --- 性能优化部分结束 --- */
