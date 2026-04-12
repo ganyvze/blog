@@ -218,8 +218,8 @@ const bannerOffset =
 				
 				// 条件1: 判断是否是加载博文。Fuwari 只有在博文页面才会设置 og:type 为 article
 				const isArticle = htmlString.includes('<meta property="og:type" content="article"');
-				// 条件2: 判断新网页的字数是否大于 60000
-				const isHeavy = htmlString.length > 60000;
+				// 条件2: 判断新网页的字数是否大于 100000
+				const isHeavy = htmlString.length > 100000;
 				
 				if (isArticle && isHeavy) { 
 					if (loader) {
