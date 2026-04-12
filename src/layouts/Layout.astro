@@ -157,12 +157,20 @@ const bannerOffset =
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
 		<div id="page-height-extend" class="hidden h-[300vh]"></div>
 		<div id="custom-loading-overlay" class="custom-loading-overlay">
-			<!-- 放弃 SVG 改用纯 CSS 结构，完美避开主线程阻塞 -->
-			<div class="pure-css-spinner"></div>
+			<div class="md-spinner">
+				<div class="md-spinner-layer">
+					<div class="md-spinner-circle-clipper left">
+						<div class="md-spinner-circle"></div>
+					</div>
+					<div class="md-spinner-circle-clipper right">
+						<div class="md-spinner-circle"></div>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<style>
-		/* 全屏背景层，完全覆盖当前网页 */
+		/* 全屏遮罩背景层 */
 		.custom-loading-overlay {
 			position: fixed;
 			inset: 0;
@@ -183,24 +191,92 @@ const bannerOffset =
 			pointer-events: auto; 
 		}
 
-		/* 纯 CSS 硬件加速转圈动画 */
-		.pure-css-spinner {
-			width: 50px;
-			height: 50px;
-			/* 轨道背景：适配明暗模式的浅灰色 */
-			border: 4px solid rgba(128, 128, 128, 0.2);
-			/* 进度条颜色：跟随 Fuwari 主题色 */
-			border-top-color: var(--primary, #3b82f6);
-			border-radius: 50%;
-			/* 强制 GPU 硬件加速层，与主线程彻底分离 */
-			transform: translateZ(0);
+		/* --- 完美复刻谷歌风格纯 CSS 硬件加速转圈 --- */
+		
+		/* 1. 外层：匀速基础旋转 */
+		.md-spinner {
+			width: 60px;
+			height: 60px;
+			animation: md-spinner-rotate 1568ms linear infinite;
+			transform: translateZ(0); /* 强制开启 GPU 硬件加速 */
 			will-change: transform;
-			animation: spin 0.8s linear infinite;
 		}
 
-		@keyframes spin {
-			0% { transform: rotate(0deg); }
+		/* 2. 动画层：颜色继承，通过分步旋转让环形开口发生位移 */
+		.md-spinner-layer {
+			width: 100%;
+			height: 100%;
+			border-color: var(--primary, #3b82f6);
+			display: flex;
+			animation: md-spinner-layer-rotate 5332ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+		}
+
+		/* 3. 左右半区裁切 */
+		.md-spinner-circle-clipper {
+			position: relative;
+			width: 50%;
+			height: 100%;
+			overflow: hidden;
+			border-color: inherit;
+		}
+
+		/* 4. 核心半圆：利用超出尺寸和边框隐藏，塑造纯 CSS 的线条 */
+		.md-spinner-circle-clipper .md-spinner-circle {
+			width: 200%;
+			height: 100%;
+			border-width: 4px; /* 转圈线条的粗细 */
+			border-style: solid;
+			border-color: inherit;
+			border-bottom-color: transparent !important;
+			border-radius: 50%;
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			transform: translateZ(0);
+			will-change: transform;
+		}
+
+		/* 左侧半圆收缩动画 */
+		.md-spinner-circle-clipper.left .md-spinner-circle {
+			left: 0;
+			border-right-color: transparent !important;
+			transform: rotate(129deg);
+			animation: md-spinner-left-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+		}
+
+		/* 右侧半圆收缩动画 */
+		.md-spinner-circle-clipper.right .md-spinner-circle {
+			left: -100%;
+			border-left-color: transparent !important;
+			transform: rotate(-129deg);
+			animation: md-spinner-right-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+		}
+
+		/* --- 关键帧部分 --- */
+		@keyframes md-spinner-rotate {
 			100% { transform: rotate(360deg); }
+		}
+
+		@keyframes md-spinner-layer-rotate {
+			12.5% { transform: rotate(135deg); }
+			25%   { transform: rotate(270deg); }
+			37.5% { transform: rotate(405deg); }
+			50%   { transform: rotate(540deg); }
+			62.5% { transform: rotate(675deg); }
+			75%   { transform: rotate(810deg); }
+			87.5% { transform: rotate(945deg); }
+			100%  { transform: rotate(1080deg); }
+		}
+
+		@keyframes md-spinner-left-spin {
+			0%, 100% { transform: rotate(130deg); }
+			50%      { transform: rotate(-5deg); }
+		}
+
+		@keyframes md-spinner-right-spin {
+			0%, 100% { transform: rotate(-130deg); }
+			50%      { transform: rotate(5deg); }
 		}
 		</style>
 
