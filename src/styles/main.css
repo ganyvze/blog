@@ -4,10 +4,9 @@
     .card-base {
         @apply rounded-[var(--radius-large)] overflow-hidden bg-[var(--card-bg)] transition;
     }
-    /*h1, h2, h3, h4, h5, h6, p, a, span, li, ul, ol, blockquote, code, pre, table, th, td, strong {
-        注意：这行给所有基础标签加了 transition，在长文中节点极多时会产生性能负担
+    h1, h2, h3, h4, h5, h6, p, a, span, li, ul, ol, blockquote, code, pre, table, th, td, strong {
         @apply transition;
-    }*/
+    }
     .card-shadow {
         @apply drop-shadow-[0_2px_4px_rgba(0,0,0,0.005)]
     }
@@ -150,18 +149,4 @@
         color: var(--codeblock-bg);
     }
   }
-}
-
-/* --- 性能优化部分开始 --- */
-/* 1. 核心：动态预估高度 */
-#post-container {
-    content-visibility: auto;
-    /* 使用 Astro 传过来的行数计算值，如果没有值则默认 2000px */
-    contain-intrinsic-size: auto var(--est-height, 2000px);
-}
-
-/* 2. 针对代码块单独优化 */
-.custom-md pre {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 300px;
 }

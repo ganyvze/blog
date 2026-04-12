@@ -28,11 +28,6 @@ const { Content, headings } = await entry.render();
 
 const { remarkPluginFrontmatter } = await entry.render();
 
-// --- 性能优化：计算预估高度 ---
-// 获取行数，每行按 28px 计算，额外加上 400px 用于补偿标题和元数据的空间
-const lines = entry.body.split('\n').length;
-const estHeight = (lines * 28) + 400;
-
 const jsonLd = {
 	"@context": "https://schema.org",
 	"@type": "BlogPosting",
@@ -48,16 +43,15 @@ const jsonLd = {
 	inLanguage: entry.data.lang
 		? entry.data.lang.replace("_", "-")
 		: siteConfig.lang.replace("_", "-"),
+	// TODO include cover image here
 };
 ---
 <MainGridLayout banner={entry.data.image} title={entry.data.title} description={entry.data.description} lang={entry.data.lang} setOGTypeArticle={true} headings={headings}>
     <script is:inline slot="head" type="application/ld+json" set:html={JSON.stringify(jsonLd)}></script>
     <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative mb-4">
-        <div 
-            id="post-container" 
-            class:list={["card-base z-10 px-6 md:px-9 pt-6 pb-4 relative w-full ", {}]}
-            style={`--est-height: ${estHeight}px`}
-        >
+        <div id="post-container" class:list={["card-base z-10 px-6 md:px-9 pt-6 pb-4 relative w-full ",
+            {}
+        ]}>
             <!-- word count and reading time -->
             <div class="flex flex-row text-black/30 dark:text-white/30 gap-5 mb-3 transition onload-animation">
                 <div class="flex flex-row items-center">
@@ -99,8 +93,16 @@ const jsonLd = {
                         tags={entry.data.tags}
                         category={entry.data.category}
                 ></PostMetadata>
+                <!--{!entry.data.image && <div class="border-[var(--line-divider)] border-dashed border-b-[1px] mb-5"></div>}-->
                 <div class="border-[var(--line-divider)] border-dashed border-b-[1px] mb-5"></div>
             </div>
+
+            <!-- always show cover as long as it has one -->
+
+            <!--{entry.data.image &&-->            
+                <!--<ImageWrapper id="post-cover" src={entry.data.image} basePath={path.join("content/posts/", getDir(entry.id))} class="mb-8 rounded-xl banner-container onload-animation"/>-->
+            <!--}-->
+
 
             <Markdown class="mb-6 markdown-content onload-animation">
                 <Content />
