@@ -4,9 +4,10 @@
     .card-base {
         @apply rounded-[var(--radius-large)] overflow-hidden bg-[var(--card-bg)] transition;
     }
-    h1, h2, h3, h4, h5, h6, p, a, span, li, ul, ol, blockquote, code, pre, table, th, td, strong {
+    /*h1, h2, h3, h4, h5, h6, p, a, span, li, ul, ol, blockquote, code, pre, table, th, td, strong {
+        注意：这行给所有基础标签加了 transition，在长文中节点极多时会产生性能负担
         @apply transition;
-    }
+    }*/
     .card-shadow {
         @apply drop-shadow-[0_2px_4px_rgba(0,0,0,0.005)]
     }
@@ -150,3 +151,17 @@
     }
   }
 }
+
+/* --- 性能优化部分开始 --- */
+/* 针对 Fuwari 文章主体启用，跳过非可视区域的渲染 */
+.custom-md {
+    content-visibility: auto;
+    contain-intrinsic-size: 1000px; /* 预估高度 */
+}
+
+/* 针对长文中的代码块单独优化，防止成千上万个 span 标签阻塞渲染 */
+.custom-md pre {
+    content-visibility: auto;
+    contain-intrinsic-size: 300px;
+}
+/* --- 性能优化部分结束 --- */
