@@ -157,10 +157,9 @@ const bannerOffset =
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
 		<div id="page-height-extend" class="hidden h-[300vh]"></div>
 		<div id="custom-loading-overlay" class="custom-loading-overlay">
-			<svg class="google-spinner" viewBox="25 25 50 50">
-				<circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="4" stroke-miterlimit="10"></circle>
-			</svg>
-			</div>
+			<!-- 放弃 SVG 改用纯 CSS 结构，完美避开主线程阻塞 -->
+			<div class="pure-css-spinner"></div>
+		</div>
 
 		<style>
 		/* 全屏背景层，完全覆盖当前网页 */
@@ -171,7 +170,6 @@ const bannerOffset =
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			/* 使用 Fuwari 内置的 CSS 变量，确保跟随用户的明暗/色调设置 */
 			background-color: var(--page-bg);
 			opacity: 0;
 			visibility: hidden;
@@ -182,35 +180,27 @@ const bannerOffset =
 		.custom-loading-overlay.show {
 			opacity: 1;
 			visibility: visible;
-			pointer-events: auto; /* 加载时阻断用户多余的点击 */
+			pointer-events: auto; 
 		}
 
-		/* 谷歌 Material Design 风格转圈动画 */
-		.google-spinner {
-			width: 60px;
-			height: 60px;
-			animation: rotate 2s linear infinite;
-			/* 强制 GPU 硬件加速，即使主线程卡死，转圈也不会卡顿 */
+		/* 纯 CSS 硬件加速转圈动画 */
+		.pure-css-spinner {
+			width: 50px;
+			height: 50px;
+			/* 轨道背景：适配明暗模式的浅灰色 */
+			border: 4px solid rgba(128, 128, 128, 0.2);
+			/* 进度条颜色：跟随 Fuwari 主题色 */
+			border-top-color: var(--primary, #3b82f6);
+			border-radius: 50%;
+			/* 强制 GPU 硬件加速层，与主线程彻底分离 */
+			transform: translateZ(0);
 			will-change: transform;
-		}
-		
-		.google-spinner .path {
-			/* 进度条颜色跟随 Fuwari 用户自定义的主题色 */
-			stroke: var(--primary, #3b82f6);
-			stroke-dasharray: 1, 200;
-			stroke-dashoffset: 0;
-			animation: dash 1.5s ease-in-out infinite;
-			stroke-linecap: round;
+			animation: spin 0.8s linear infinite;
 		}
 
-		@keyframes rotate {
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
 			100% { transform: rotate(360deg); }
-		}
-		
-		@keyframes dash {
-			0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
-			50% { stroke-dasharray: 89, 200; stroke-dashoffset: -35px; }
-			100% { stroke-dasharray: 89, 200; stroke-dashoffset: -124px; }
 		}
 		</style>
 
@@ -223,51 +213,57 @@ const bannerOffset =
 			let isLoaderShown = false;
 			const loader = document.getElementById('custom-loading-overlay');
 
-			// 拦截 Swup 替换新页面的钩子阶段
 			window.swup.hooks.before('content:replace', async (visit) => {
-			// 获取即将渲染的新网页 HTML 源码
-			const htmlString = visit.to.html || (visit.to.document ? visit.to.document.body.innerHTML : "");
-			
-			// 【字数阈值】: 80000 字符的 HTML 大约是一篇包含较多代码块和图片的超长文。
-			// 可以根据你实际卡顿的博文大小，调大或调小这个数值。
-			if (htmlString.length > 20000) { 
-				if (loader) {
-				loader.classList.add('show');
-				isLoaderShown = true;
-				// 核心魔法：强制暂停 Swup 进程 300ms。
-				// 给遮罩层充分的时间完成渐入动画。待遮盖严实后，浏览器才会开始在底层渲染那庞大且卡顿的正文DOM树。
-				await new Promise(resolve => setTimeout(resolve, 300));
+				const htmlString = visit.to.html || (visit.to.document ? visit.to.document.body.innerHTML : "");
+				
+				// 条件1: 判断是否是加载博文。Fuwari 只有在博文页面才会设置 og:type 为 article
+				const isArticle = htmlString.includes('<meta property="og:type" content="article"');
+				// 条件2: 判断新网页的字数是否大于 60000
+				const isHeavy = htmlString.length > 60000;
+				
+				if (isArticle && isHeavy) { 
+					if (loader) {
+						loader.classList.add('show');
+						isLoaderShown = true;
+						
+						// 核心魔法 2.0：强制浏览器重绘和 GPU 移交。
+						// 使用双重 requestAnimationFrame 确保纯色的背景和转圈已经在显卡上渲染并运行后，
+						// 再通过 setTimeout 放行 Swup，让它在后台去尽情卡顿主线程。
+						await new Promise(resolve => {
+							requestAnimationFrame(() => {
+								requestAnimationFrame(() => {
+									setTimeout(resolve, 350); // 给 350ms 充分的渐入时间
+								});
+							});
+						});
+					}
 				}
-			}
 			});
 
-			// 隐藏逻辑：提取为函数以应对正常结束或中断等事件
 			const hideLoader = async () => {
-			if (isLoaderShown) {
-				// 给浏览器 100ms 缓冲，确保新页面的所有排版已稳定
-				await new Promise(resolve => setTimeout(resolve, 100));
-				if (loader) loader.classList.remove('show');
-				isLoaderShown = false;
-			}
+				if (isLoaderShown) {
+					// 延迟 150ms 褪去遮罩，掩盖页面新渲染刚结束时的瞬间抖动
+					await new Promise(resolve => setTimeout(resolve, 150));
+					if (loader) loader.classList.remove('show');
+					isLoaderShown = false;
+				}
 			};
 
-			// 监听各类路由结束钩子，让遮罩层优雅地褪去
 			window.swup.hooks.on('visit:end', hideLoader);
 			window.swup.hooks.on('visit:abort', hideLoader);
 			window.swup.hooks.on('fetch:error', hideLoader);
 		}
 
-		// 轮询等待 Swup 加载完成并挂载钩子
 		if (window.swup) {
 			setupHeavyPageLoader();
 		} else {
 			const interval = setInterval(() => {
-			if (window.swup) {
-				setupHeavyPageLoader();
-				clearInterval(interval);
-			}
+				if (window.swup) {
+					setupHeavyPageLoader();
+					clearInterval(interval);
+				}
 			}, 50);
-			setTimeout(() => clearInterval(interval), 5000); // 兜底防止死循环
+			setTimeout(() => clearInterval(interval), 5000); 
 		}
 		</script>
 	</body>
