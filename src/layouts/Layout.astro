@@ -181,7 +181,8 @@ const bannerOffset =
 			background-color: var(--page-bg);
 			opacity: 0;
 			visibility: hidden;
-			transition: opacity 0.3s ease, visibility 0.3s ease;
+			/* 👇 优化点1：更细腻的渐现渐隐，使用了丝滑的贝塞尔曲线过渡 */
+			transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 			pointer-events: none;
 		}
 		
@@ -224,8 +225,7 @@ const bannerOffset =
 			box-sizing: border-box;
 			width: 200%;
 			height: 100%;
-			/* 👇 在这里修改线条粗细：将原本的 4px 改为了 5px (稍微加粗一点点) */
-			border: 5px solid var(--primary, #3b82f6);
+			border: 5.5px solid var(--primary, #3b82f6);
 			border-bottom-color: transparent !important;
 			border-radius: 50%;
 			position: absolute;
@@ -274,6 +274,64 @@ const bannerOffset =
 			100% { transform: rotate(-130deg); }
 		}
 		</style>
+
+		<script is:inline>
+		function setupHeavyPageLoader() {
+			if (!window.swup) return;
+			if (window.swup._heavyLoaderAttached) return;
+			window.swup._heavyLoaderAttached = true;
+
+			let isLoaderShown = false;
+			const loader = document.getElementById('custom-loading-overlay');
+
+			window.swup.hooks.before('content:replace', async (visit) => {
+				const htmlString = visit.to.html || (visit.to.document ? visit.to.document.body.innerHTML : "");
+				
+				const isArticle = htmlString.includes('<meta property="og:type" content="article"');
+				const isHeavy = htmlString.length > 100000;
+				
+				if (isArticle && isHeavy) { 
+					if (loader) {
+						loader.classList.add('show');
+						isLoaderShown = true;
+						
+						await new Promise(resolve => {
+							requestAnimationFrame(() => {
+								requestAnimationFrame(() => {
+									setTimeout(resolve, 350); 
+								});
+							});
+						});
+					}
+				}
+			});
+
+			const hideLoader = async () => {
+				if (isLoaderShown) {
+					// 👇 优化点2：等待动画排版结束后，再额外强制停留 500ms (0.5秒)
+					await new Promise(resolve => setTimeout(resolve, 500));
+					if (loader) loader.classList.remove('show');
+					isLoaderShown = false;
+				}
+			};
+
+			window.swup.hooks.on('visit:end', hideLoader);
+			window.swup.hooks.on('visit:abort', hideLoader);
+			window.swup.hooks.on('fetch:error', hideLoader);
+		}
+
+		if (window.swup) {
+			setupHeavyPageLoader();
+		} else {
+			const interval = setInterval(() => {
+				if (window.swup) {
+					setupHeavyPageLoader();
+					clearInterval(interval);
+				}
+			}, 50);
+			setTimeout(() => clearInterval(interval), 5000); 
+		}
+		</script>
 
 		<script is:inline>
 		function setupHeavyPageLoader() {
