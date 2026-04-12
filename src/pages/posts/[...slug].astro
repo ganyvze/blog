@@ -93,6 +93,7 @@ const jsonLd = {
                         tags={entry.data.tags}
                         category={entry.data.category}
                 ></PostMetadata>
+                <!--{!entry.data.image && <div class="border-[var(--line-divider)] border-dashed border-b-[1px] mb-5"></div>}-->
                 <div class="border-[var(--line-divider)] border-dashed border-b-[1px] mb-5"></div>
             </div>
 
@@ -110,6 +111,11 @@ const jsonLd = {
             {licenseConfig.enable && <License title={entry.data.title} slug={entry.slug} pubDate={entry.data.published} class="mb-6 rounded-xl license-container onload-animation"></License>}
 
         </div>
+    </div>
+
+    <!-- 评论区 -->
+    <div class="card-base p-6 mb-4 onload-animation">
+        <Comments />
     </div>
 
     <div class="flex flex-col md:flex-row justify-between mb-4 gap-4 overflow-hidden w-full">
@@ -132,11 +138,6 @@ const jsonLd = {
                 <Icon name="material-symbols:chevron-right-rounded" class="text-[2rem] text-[var(--primary)]" />
             </div>}
         </a>
-    </div>
-
-    <!-- 插入评论区 -->
-    <div class="card-base p-6 mb-4 onload-animation">
-        <Comments />
     </div>
 
 </MainGridLayout>
