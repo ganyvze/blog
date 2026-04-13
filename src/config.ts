@@ -7,6 +7,15 @@ import type {
 } from "./types/config";
 import { LinkPreset } from "./types/config";
 
+// 定义站点地址
+const MAIN_SITE_URL = "https://ganyvze.pages.dev"; // 主站地址
+const BACKUP_SITE_URL = "https://ganyvze.netlify.app"; // 备用站地址
+// 获取当前是否为备用站的环境变量 (在部署平台设置)
+// 也可以根据构建环境自动判断，比如：
+//Netlify:const isBackup = process.env.NETLIFY === 'true';
+//Cloudflare:const isBackup = process.env.CF_PAGES === '1';
+const isBackup = process.env.SITE_ENV === 'backup';
+
 export const siteConfig: SiteConfig = {
 	title: "ganyvze的博客",
 	subtitle: "记录生活与技术",
@@ -45,14 +54,19 @@ export const navBarConfig: NavBarConfig = {
 		LinkPreset.Archive,
 		LinkPreset.About,
 		{
-			name: "ganyvze.github.io",
+			name: "游戏",
 			url: "https://ganyvze.github.io", // Internal links should not include the base path, as it is automatically added
 			external: true, // Show an external link icon and will open in a new tab
 		},
 		{
-			name: "oirush.cn",
+			name: "oirush",
 			url: "https://oirush.cn",
 			external: true,
+		},
+		{
+			name: isBackup ? "前往主站" : "备用站点",
+			url: isBackup ? MAIN_SITE_URL : BACKUP_SITE_URL,
+			external: false,
 		},
 	],
 };
