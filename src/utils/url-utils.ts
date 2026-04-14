@@ -40,5 +40,10 @@ export function getDir(path: string): string {
 }
 
 export function url(path: string) {
-	return joinUrl("", import.meta.env.BASE_URL, path);
+    // 如果 path 是以 http:// 或 https:// 开头的绝对路径，直接返回
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+    // 否则才拼接基础路径
+    return joinUrl("", import.meta.env.BASE_URL, path);
 }

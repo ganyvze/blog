@@ -66,7 +66,7 @@ export const navBarConfig: NavBarConfig = {
 		{
 			name: isBackup ? "前往主站" : "备用站点",
 			url: isBackup ? MAIN_SITE_URL : BACKUP_SITE_URL,
-			external: true,
+			external: false,
 		},
 	],
 };
