@@ -17,7 +17,7 @@ draft: false
 -std=c++11
 ```
 ```cpp
-//局域网聊天室管理控制台 - v1.0
+//局域网聊天室控制台 - v1.1
 #include <iostream>
 #include <string>
 #include <vector>

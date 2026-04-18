@@ -12,7 +12,7 @@ draft: false
 -std=c++11
 ```
 ```cpp
-// 局域网聊天室 - v7.0
+// 局域网聊天室 - v7.1
 #include<bits/stdc++.h>
 #include<winsock2.h>
 #include<windows.h>
@@ -343,7 +343,8 @@ if (abs(wall_now_ms() - ts) > 5000) continue;
 string data_to_verify = to_string(ts) + "\n" + body;
 if (!verify_ecdsa_p256(ADMIN_PUB_KEY, sig, data_to_verify)) continue;
 
-if (body == "list") {send_udp_raw(build_packet("ADMIN_REP", {{"ID", to_string(my_id)}}, "ONLINE"), sender_ip);
+if (body == "list") {
+    string rep_pkt = build_packet("ADMIN_REP", {{"ID", to_string(my_id)}}, "ONLINE");API.st(udp_socket, rep_pkt.c_str(), (int)rep_pkt.size(), 0, (struct sockaddr*)&sender_addr, sizeof(sender_addr));
 } else if (starts_with(body, "remove ")) {
 string ip = trim_copy(body.substr(7));
 if (ip == my_ip) trigger_kick("您已被管理员强制下线");
