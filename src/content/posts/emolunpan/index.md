@@ -9,7 +9,7 @@ draft: false
 ---
 
 ```shell
--std=c++14 -Wl,--stack=200000000
+-std=c++11
 ```
 ```cpp
 //恶魔轮盘赌 - v4.0
