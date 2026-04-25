@@ -8,8 +8,7 @@ category: 后台
 draft: false
 ---
 
-# 注意：此程序**不**提供给其他人使用！
-## **[点击此处](https://oirush.cn/blog/997/69c7f62d04f64d77e98d0164)下载局域网聊天室客户端**
+## **[局域网聊天室客户端](https://ganyvze.pages.dev/posts/control)**
 
 ---
 
