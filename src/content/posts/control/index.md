@@ -1,7 +1,7 @@
 ---
 title: 局域网聊天室管理控制台
 published: 2026-01-08
-description: "v1.0"
+description: "v1.1"
 image: "./cover.jpeg"
 tags: ["Dashboard"]
 category: 后台
