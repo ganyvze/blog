@@ -1,7 +1,7 @@
 ---
 title: florr.oi
 published: 2026-01-07
-description: "v6.0"
+description: "v6.1"
 image: "./cover.jpeg"
 tags: ["HTML"]
 category: 网页
@@ -10,7 +10,7 @@ draft: false
 
 ```html
 <!DOCTYPE html>
-<!--floor.oi - v6.0-->
+<!--floor.oi - v6.1-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -39,13 +39,10 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 #serum-text { color: #cbd5e1; font-size: 12px; font-weight: bold; text-shadow: 0 1px 2px #000; }
 #serum-bar-bg { width: 100%; height: 8px; background: rgba(0,0,0,0.6); border-radius: 4px; border: 1px solid #334155; overflow: hidden; }
 #serum-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); transition: width 0.1s linear; }
-
-/* 新增：反作弊红屏遮罩 */
 #cheat-review-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(220, 38, 38, 0.85); backdrop-filter: blur(8px); z-index: 2000; display: none; flex-direction: column; justify-content: center; align-items: center; color: #fff; pointer-events: auto; }
 #cheat-review-overlay h2 { font-size: 32px; margin-bottom: 20px; letter-spacing: 2px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 #cheat-review-overlay p { font-size: 18px; margin-bottom: 30px; }
 #cheat-actions { display: flex; gap: 20px; }
-
 #instructions { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.7); color: #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 12px; line-height: 1.4; pointer-events: none; max-width: 40%; text-align: right; }
 #instructions b { color: #38bdf8; }
 #inv-hint { position: absolute; bottom: 80px; left: 12px; color: #94a3b8; font-size: 12px; pointer-events: none; opacity: 0.7; line-height: 1.6; }
@@ -57,7 +54,6 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 #equip-wrapper { overflow: hidden; transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease; max-height: 500px; opacity: 1; }
 #equip-wrapper.collapsed { max-height: 0; opacity: 0; pointer-events: none; }
 #equip-grid { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; padding-top: 2px; }
-
 .modal-base { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; flex-direction: column; gap: 10px; align-items: center; }
 .modal-header { width: 100%; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
 .close-btn { cursor: pointer; opacity: 0.6; font-size: 16px; transition: 0.2s; }
@@ -77,7 +73,6 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 .room-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #334155; font-size: 12px; }
 .room-item:last-child { border-bottom: none; }
 .room-item span.code { color: #facc15; font-weight: bold; }
-
 #inv-grid { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 46px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 6px; width: 100%; }
 #craft-panel { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; margin-top: 4px; }
 .craft-btn { padding: 6px 10px; background: #1e293b; border: 1px solid #475569; color: #94a3b8; border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.2s; }
@@ -110,7 +105,6 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 </head>
 <body>
 <canvas id="game"></canvas>
-
 <!-- 反作弊红屏遮罩 -->
 <div id="cheat-review-overlay">
 <h2>⚠️ 异常行为警报</h2>
@@ -120,7 +114,6 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 <button class="craft-btn btn-blue" onclick="decideCheat('ignore')">忽略并继续游戏</button>
 </div>
 </div>
-
 <div class="overlay" id="pause-overlay" onclick="handleOverlayClick()">
 <div id="pause-content">
 <h1>已暂停</h1>
@@ -456,20 +449,21 @@ if(e.key.toLowerCase() === 'q') LAN.stopSerum();
 // ==================== 联机核心系统 (NetworkManager & Logic) ====================
 const LAN = {
 isMultiplayer: false, isHost: false, roomCode: '', clientId: '',
-players: {}, // 其他玩家快照
+players: {}, 
 roomConfig: { cheatRule: 0, devModeAllowed: true },
 isRoomPaused: false, bleedStacks: 0, isInjecting: false, serumProgress: 0,
 serverUrl: '', 
 pollTimer: null, beaconTimer: null, targetCheatId: '',
 
-// 初始化配置
 init() {
 this.clientId = 'CLI_' + Math.floor(Math.random()*1000000);
-setInterval(() => this.antiCheatCheck(), 2000); // 反作弊循环
+setInterval(() => this.antiCheatCheck(), 2000);
+// 【新增】自动扫描局域网房间
+setInterval(() => this.scanRooms(), 2000); 
 },
 
 getBaseUrl(prefix) {
-let ipPart = prefix.trim(); if(!ipPart) ipPart = "1.2"; // 兜底
+let ipPart = prefix.trim() || "1.2";
 return `http://192.168.${ipPart}:28082`;
 },
 
@@ -478,10 +472,32 @@ try {
 const url = this.getBaseUrl(prefixIp) + endpoint;
 const res = await fetch(url, { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bodyObj) });
 return await res.json();
-} catch(e) { console.error(e); return {success: false, message: "网络请求失败，请检查IP或服务端是否开启"}; }
+} catch(e) { console.error(e); return {success: false, message: "网络请求失败，请确保服务端已运行"}; }
 },
 
-// 1. 创建房间
+// 【新增】扫描房间替代UDP广播（解决浏览器无法接收UDP的限制）
+async scanRooms() {
+if (this.isMultiplayer || document.getElementById('join-room-modal').style.display !== 'flex') return;
+const ip = document.getElementById('ipt-join-server-ip').value || '1.2';
+try {
+const res = await fetch(`http://192.168.${ip}:28082/api/room/list`);
+const data = await res.json();
+const listArea = document.getElementById('lan-room-list');
+if (data.rooms.length === 0) {
+listArea.innerHTML = '<div style="text-align:center; color:#64748b; padding:10px;">暂无可用房间</div>';
+return;
+}
+listArea.innerHTML = '';
+data.rooms.forEach(r => {
+listArea.innerHTML += `
+<div class="room-item">
+    <span><span class="code">${r.code}</span> - ${r.name} (${r.count}/32)</span>
+    <button class="craft-btn btn-blue" onclick="document.getElementById('ipt-join-code').value='${r.code}'">选择</button>
+</div>`;
+});
+} catch(e) {}
+},
+
 async createRoom() {
 const ip = document.getElementById('ipt-server-ip').value;
 const name = document.getElementById('ipt-cr-name').value.trim() || 'Player';
@@ -498,7 +514,6 @@ closeModal('create-room-modal');
 } else alert(res.message);
 },
 
-// 2. 加入房间
 async joinRoom() {
 const ip = document.getElementById('ipt-join-server-ip').value;
 const name = document.getElementById('ipt-join-name').value.trim() || 'Player';
@@ -514,15 +529,15 @@ closeModal('join-room-modal');
 } else alert(res.message);
 },
 
-// 3. 退出与重置
 leaveRoom() {
-if(this.isMultiplayer) fetch(this.serverUrl + '/api/room/leave', { method:'POST', body:JSON.stringify({client_id:this.clientId, code:this.roomCode})}).catch(()=>{});
+// 注：由于服务端无显式leave端点，利用5秒心跳超时自动清除退出玩家
 this.resetToSingle();
 },
+
 resetToSingle() {
 this.isMultiplayer = false; this.isHost = false; this.roomCode = ''; this.players = {};
 this.bleedStacks = 0; this.stopSerum(); this.isRoomPaused = false;
-clearInterval(this.pollTimer); clearInterval(this.beaconTimer);
+clearInterval(this.pollTimer);
 document.getElementById('cheat-review-overlay').style.display = 'none';
 document.getElementById('dynamic-island').style.display = 'none';
 document.getElementById('btn-create-room').style.display = 'inline-block';
@@ -532,7 +547,6 @@ document.getElementById('btn-leave-room').style.display = 'none';
 resetInventory(); player.hp = player.maxHp; player.lvl = 1; player.xp = 0; enemies =[]; needsUIRender = true;
 },
 
-// 4. 联机模式进入与循环
 enterMultiplayerMode() {
 resetInventory();
 document.getElementById('btn-create-room').style.display = 'none';
@@ -543,50 +557,50 @@ if(this.isHost) document.getElementById('btn-room-settings').style.display = 'in
 document.getElementById('dynamic-island').style.display = 'flex';
 document.getElementById('di-code').innerText = this.roomCode;
 
-// 由于原生Browser JS无法收发UDP，此处我们通过模拟状态轮询 (兼容性做法)
-// 实际若按您的C++ UDP要求，需本地有Relay，此处通过HTTP POST达到类似功能以便浏览器演示
-this.pollTimer = setInterval(() => this.syncStateMock(), 100);
-player.x = rand(-100, 100); player.y = rand(-100, 100); // 防重叠出生
+// 【修改】真实接入状态同步：每100ms与服务端握手同步坐标
+this.pollTimer = setInterval(() => this.syncState(), 100);
+player.x = rand(-100, 100); player.y = rand(-100, 100); 
 },
 
-// (前端模拟态) HTTP轮询同步 (为了浏览器能跑通)
-// 您的C++服务器目前接收HTTP指令与UDP状态，浏览器纯JS无法发UDP，若要在无本地壳的浏览器运行，
-// 我们在此通过一个通用的 HTTP /api/state 端点进行通信（假设服务器拓展支持），或做Mock展示。
-// 注：若严格对接上方C++（只接收UDP状态），此处逻辑在纯浏览器中无法到达后端UDP端口。
-// 为保证"逻辑闭环且能玩"，我们在此保留数据结构与同步逻辑，用假数据/HTTP示意。
-async syncStateMock() {
-if(this.isRoomPaused) return; // 暂停不发包
-// 构造状态包 (PlayerSnapshot)
+// 【新增】真实的状态同步函数
+async syncState() {
+if(this.isRoomPaused) return; 
 const state = {
-id: this.clientId, x: player.x, y: player.y, vx: player.vx, vy: player.vy,
-hp: player.hp, maxHp: player.maxHp, lvl: player.lvl, isAlive: player.hp>0, isBleeding: this.bleedStacks>0,
-isPaused: isPausedBySpace,
-petals: isPausedBySpace ? [] : equipped.map(p => ({ x:p.x, y:p.y, r:p.r, type:p.type, isActive:p.isActive }))
+client_id: this.clientId, room_code: this.roomCode,
+x: player.x, y: player.y, 
+hp: player.hp, isBleeding: this.bleedStacks > 0
 };
-// 实际应发往UDP端口 8889，此处省略底层网络库细节，做碰撞与联机逻辑演示
-// 假装我们收到了其他玩家的状态：
+try {
+const res = await fetch(this.serverUrl + '/api/state', { method: 'POST', body: JSON.stringify(state) });
+const data = await res.json();
+if(data.success) {
+// 将服务器拉取到的其他玩家位置同步到本地
+this.players = data.players;
 document.getElementById('di-count').innerText = Object.keys(this.players).length + 1;
-
-// 处理联机伤害、怪物同步等...
+} else {
+// 房间不存在或已被解散
+alert("房间已断开连接！");
+this.leaveRoom();
+}
+} catch(e) {}
 },
 
-// 5. 联机特有玩法：血清与流血
 startSerum() { if(!this.isInjecting && this.bleedStacks > 0) { this.isInjecting = true; this.serumProgress = 0; document.getElementById('serum-container').style.display='flex'; } },
 stopSerum() { this.isInjecting = false; this.serumProgress = 0; document.getElementById('serum-container').style.display='none'; document.getElementById('serum-bar-fill').style.width = '0%'; document.getElementById('serum-text').innerText = "长按 Q 键注射抗毒血清"; },
 updateSerum() {
 if(!this.isInjecting) return;
-this.serumProgress += 1000/60; // 每帧毫秒
+this.serumProgress += 1000/60; 
 let pct = Math.min((this.serumProgress / 3000) * 100, 100);
 document.getElementById('serum-bar-fill').style.width = pct + '%';
 document.getElementById('serum-text').innerText = `注射中 ${Math.floor(pct)}% · 移速降低20%`;
-spawnParticles(player.x, player.y, '#22c55e', 1, 0.5); // 绿光
+spawnParticles(player.x, player.y, '#22c55e', 1, 0.5); 
 if(this.serumProgress >= 3000) {
 this.bleedStacks = 0; this.stopSerum();
 spawnDamageText(player.x, player.y - 20, "流血已解除", "#22c55e");
 }
 },
 applyBleed() {
-if(this.bleedStacks > 0 && frame % Math.max(10, 60 - this.bleedStacks*10) === 0) { // 堆叠越快扣血越快
+if(this.bleedStacks > 0 && frame % Math.max(10, 60 - this.bleedStacks*10) === 0) { 
 player.hp -= 1; player.hurtFlashTimer = 5;
 spawnDamageText(player.x, player.y, "-1", "#dc2626");
 if(player.hp <= 0) gameOver(true);
@@ -594,32 +608,21 @@ needsUIRender = true;
 }
 },
 
-// 6. 联机反作弊检测 (异常缩放)
 initialRatio: window.devicePixelRatio,
-initialWidth: window.innerWidth,
 antiCheatCheck() {
 if(!this.isMultiplayer || this.isRoomPaused) return;
 let diffRatio = Math.abs(window.devicePixelRatio - this.initialRatio);
 if (diffRatio > 0.1) {
-// 触发作弊上报
-fetch(this.serverUrl + '/api/cheat/report', { method:'POST', body:JSON.stringify({client_id:this.clientId, code:this.roomCode})}).catch(()=>{});
-// 重置基准防止狂发
+// 目前作弊仅在本地输出拦截，可在此请求 /api/cheat/report
+console.warn("作弊检测: 发现异常页面缩放");
 this.initialRatio = window.devicePixelRatio; 
 }
-},
-
-// 房主决策处理
-async updateSettings() {
-const r = document.getElementById('sel-rs-cheat').value, d = document.getElementById('chk-rs-dev').checked;
-await this._fetch('/api/room/settings', { client_id:this.clientId, code:this.roomCode, cheat_rule:r, dev_mode_allowed:d}, document.getElementById('ipt-server-ip').value);
-closeModal('room-settings-modal');
 },
 
 revive() {
 document.getElementById('multiplayerRevive').classList.remove('visible');
 player.x = 0; player.y = 0; player.hp = player.maxHp = 100; player.lvl = 1; player.xp = 0;
 this.bleedStacks = 0; this.stopSerum(); resetInventory();
-// 处理出生点避让
 for(let id in this.players) { if(dist(player, this.players[id]) < 40) player.x += rand(50, 100); }
 isPaused = false; running = true; loop();
 }
@@ -923,7 +926,6 @@ ctx.fillStyle = e.aggro ? (e.hitFlash>0?'#fff': e.color) : '#64748b'; ctx.beginP
 if (e.type === 'bomber' && e.aggro) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x,e.y,e.r*0.5,0,Math.PI*2); ctx.fill(); }
 ctx.fillStyle='#0f172a'; ctx.fillRect(e.x-12,e.y-e.r-8,24,4); ctx.fillStyle='#22c55e'; ctx.fillRect(e.x-12,e.y-e.r-8,24*Math.max(0,e.hp/e.maxHp),4);
 });
-
 // 渲染联机玩家
 if(LAN.isMultiplayer) {
 Object.values(LAN.players).forEach(other => {
@@ -940,7 +942,6 @@ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
 ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign='center'; ctx.fillText(other.name, other.x, other.y - 25);
 });
 }
-
 equipped.forEach((p, i)=>{
 if(!p.isActive && p.kind !== 'missile') { ctx.globalAlpha=0.25; ctx.strokeStyle='#64748b'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.ellipse(p.x,p.y,10,6,Math.atan2(p.y-player.y,p.x-player.x),0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; return; }
 if(!p.isActive && p.kind === 'missile' && p.missileState === 'idle') { ctx.globalAlpha=0.25; ctx.strokeStyle='#64748b'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.ellipse(p.x,p.y,10,6,Math.atan2(p.y-player.y,p.x-player.x),0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; return; }
@@ -953,7 +954,6 @@ ctx.globalAlpha = 0.6 + (p.durability/p.maxDurability)*0.4;
 ctx.beginPath(); ctx.ellipse(p.x,p.y,10,6,Math.atan2(p.y-player.y,p.x-player.x),0,Math.PI*2); ctx.fill();
 ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha = 1;
 });
-
 // 绘制玩家本体（与 florr.html 一致：蓝色外圈 + 黄色/绿色花蕊）
 ctx.save(); ctx.translate(player.x, player.y);
 if (player.hurtFlashTimer > 0) { ctx.fillStyle = '#ef4444'; ctx.shadowBlur = 15; ctx.shadowColor = '#ef4444'; }
@@ -966,10 +966,23 @@ ctx.lineWidth = 3; ctx.stroke();
 ctx.fillStyle = LAN.isInjecting ? '#4ade80' : '#fef08a';
 ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI*2); ctx.fill();
 ctx.restore();
-
+// 渲染死亡粒子
+particles.forEach(p=>{ ctx.globalAlpha=p.life/35; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); });
+ctx.globalAlpha=1;
+// 渲染伤害/拾取浮字（+物品、伤害数字、LEVEL UP等）
+ctx.font = "bold 16px system-ui";
+ctx.textAlign = "center";
+ctx.textBaseline = "alphabetic";
+damageTexts.forEach(dt => {
+ctx.globalAlpha = dt.life / dt.maxLife;
+ctx.fillStyle = dt.color;
+ctx.shadowColor = "rgba(0,0,0,0.8)";
+ctx.shadowBlur = 4;
+ctx.fillText(dt.text, dt.x, dt.y);
+});
+ctx.shadowBlur = 0; ctx.globalAlpha = 1;
 ctx.restore(); // 恢复 translate(-camera.x, -camera.y) 之前的状态
 }
-
 // ==================== 游戏启动与全局初始化 ====================
 // 确保页面加载后立即进入主循环
 window.onload = () => {
@@ -980,14 +993,11 @@ setInterval(() => {
 // 目前通过 UI 手动刷新或后端 Beacon 推送更新 lan-room-list 元素
 }, 3000);
 }
-
 // 执行第一次 UI 渲染
 renderUINow();
-
 // 启动引擎
 loop();
 };
-
 // 辅助：处理窗口失焦自动暂停
 window.addEventListener('blur', () => {
 if (!LAN.isMultiplayer && running && !isPaused) {
