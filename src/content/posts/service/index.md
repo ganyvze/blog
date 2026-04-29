@@ -1,7 +1,7 @@
 ---
 title: florr.oi联机服务端
 published: 2026-01-09
-description: "v1.0"
+description: "v1.1"
 image: "./cover.jpeg"
 tags: ["C++"]
 category: 程序
@@ -9,7 +9,7 @@ draft: false
 ---
 
 ```cpp
-//florr.oi联机服务端 - v1.0
+//florr.oi联机服务端 - v1.1
 #include <iostream>
 #include <string>
 #include <thread>
@@ -19,6 +19,7 @@ draft: false
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <chrono>
 
 using namespace std;
 
@@ -120,7 +121,10 @@ bool getJsonBool(const string& json, const string& key) {
 }
 
 long long getTimestamp() {
-    return GetTickCount64();
+    // 获取当前时间戳（毫秒）
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()
+    ).count();
 }
 
 // --- HTTP 响应构造 ---
