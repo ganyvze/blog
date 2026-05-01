@@ -60,7 +60,7 @@ export const navBarConfig: NavBarConfig = {
 		},
 		{
 			name: "oirush",
-			url: "https://oirush.cn",
+			url: "https://ganyvze.qzz.io",
 			external: true,
 		},
 		{
