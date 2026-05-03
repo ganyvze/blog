@@ -1,7 +1,7 @@
 ---
 title: florr.oi
 published: 2026-01-07
-description: "v6.1"
+description: "v7.0"
 image: "./cover.jpeg"
 tags: ["HTML"]
 category: 网页
@@ -10,7 +10,7 @@ draft: false
 
 ```html
 <!DOCTYPE html>
-<!--floor.oi - v6.1-->
+<!--floor.oi - v7.0-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -52,7 +52,12 @@ canvas { display: block; background: #1e293b; cursor: crosshair; position: absol
 #equip-header:hover { color: #facc15; }
 #equip-toggle { font-size: 14px; transition: transform 0.3s ease; color: #94a3b8; }
 #equip-wrapper { overflow: hidden; transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease; max-height: 500px; opacity: 1; }
-#equip-wrapper.collapsed { max-height: 0; opacity: 0; pointer-events: none; }
+#equip-wrapper.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+#equip-wrapper.scrollable { overflow-y: auto; }
+#equip-wrapper::-webkit-scrollbar { width: 5px; }
+#equip-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+#equip-wrapper::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+#equip-wrapper::-webkit-scrollbar-thumb:hover { background: #64748b; }
 #equip-grid { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; padding-top: 2px; }
 .modal-base { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; flex-direction: column; gap: 10px; align-items: center; }
 .modal-header { width: 100%; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
@@ -326,9 +331,9 @@ const TIERS =['common', 'unusual', 'rare', 'epic', 'legendary', 'mythic'];
 const TIER_NAMES = { common:'普通', unusual:'不凡', rare:'稀有', epic:'史诗', legendary:'传奇', mythic:'至臻' };
 const TIER_COLORS = { common:'#22c55e', unusual:'#eab308', rare:'#3b82f6', epic:'#a855f7', legendary:'#ef4444', mythic:'#ffffff' };
 const TIER_STATS = { 
-common:   { dmg:3, speedBonus:1.0, regen: 180 }, unusual:  { dmg:5, speedBonus:1.1, regen: 150 }, 
-rare:     { dmg:8, speedBonus:1.2, regen: 120 }, epic:     { dmg:12, speedBonus:1.35, regen: 90 }, 
-legendary:{ dmg:18, speedBonus:1.5, regen: 60 }, mythic:   { dmg:28, speedBonus:1.8, regen: 30 }
+common:   { dmg:3, speedBonus:1.0, regen: 180, ffDmg: 5 }, unusual:  { dmg:5, speedBonus:1.1, regen: 150, ffDmg: 8 }, 
+rare:     { dmg:8, speedBonus:1.2, regen: 120, ffDmg: 12 }, epic:     { dmg:12, speedBonus:1.35, regen: 90, ffDmg: 15 }, 
+legendary:{ dmg:18, speedBonus:1.5, regen: 60, ffDmg: 20 }, mythic:   { dmg:28, speedBonus:1.8, regen: 30, ffDmg: 28 }
 };
 const KIND_ICONS = { melee:'', explosive:'爆', missile:'射', speed:'速', guardian:'护' };
 const BASE_CRAFT_RATES = { common:0.68, unusual:0.58, rare:0.48, epic:0.38, legendary:0.28 };
@@ -397,7 +402,7 @@ function toggleEquipBar() {
 equipCollapsed = !equipCollapsed;
 const wrapper = document.getElementById('equip-wrapper'), toggleBtn = document.getElementById('equip-toggle');
 if (equipCollapsed) { wrapper.classList.add('collapsed'); toggleBtn.textContent = '▲'; } 
-else { wrapper.classList.remove('collapsed'); toggleBtn.textContent = '▼'; }
+else { wrapper.classList.remove('collapsed'); toggleBtn.textContent = '▼'; needsUIRender = true; }
 }
 function togglePause() { if (!activeModal) { isPausedBySpace = !isPausedBySpace; updatePauseState(); } }
 function updatePauseState() {
@@ -450,8 +455,9 @@ if(e.key.toLowerCase() === 'q') LAN.stopSerum();
 const LAN = {
 isMultiplayer: false, isHost: false, roomCode: '', clientId: '',
 players: {}, 
+playerPetalsState: {}, // 存储玩家花瓣的动态状态
 roomConfig: { cheatRule: 0, devModeAllowed: true },
-isRoomPaused: false, bleedStacks: 0, isInjecting: false, serumProgress: 0,
+isRoomPaused: false, bleedStacks: 0, isInjecting: false, serumProgress: 0, bleedStartTime: 0, lastBleedTick: 0,
 serverUrl: '', 
 pollTimer: null, beaconTimer: null, targetCheatId: '',
 
@@ -460,6 +466,70 @@ this.clientId = 'CLI_' + Math.floor(Math.random()*1000000);
 setInterval(() => this.antiCheatCheck(), 2000);
 // 【新增】自动扫描局域网房间
 setInterval(() => this.scanRooms(), 2000); 
+},
+// 更新玩家花瓣的动态状态
+updatePetalsState(dt) {
+for (const playerId in this.playerPetalsState) {
+const state = this.playerPetalsState[playerId];
+const petals = state.petals;
+for (let i = 0; i < petals.length; i++) {
+const petalState = petals[i];
+// 平滑调整速度到目标值
+const speedDiff = petalState.targetSpeed - petalState.currentSpeed;
+petalState.currentSpeed += speedDiff * 0.1; // 平滑系数
+// 更新角度
+petalState.angle += petalState.currentSpeed * dt;
+// 归一化角度
+petalState.angle = petalState.angle % (Math.PI * 2);
+if (petalState.angle < 0) petalState.angle += Math.PI * 2;
+}
+}
+},
+// 平滑插值其他玩家的显示位置
+	updatePlayerInterpolation(dt) {
+		for (const playerId in this.playerPetalsState) {
+			const state = this.playerPetalsState[playerId];
+			if (!this.players[playerId]) continue;
+			const dx = state.targetX - state.displayX;
+			const dy = state.targetY - state.displayY;
+			const dist = Math.hypot(dx, dy);
+			if (dist < 0.5) {
+				state.displayX = state.targetX;
+				state.displayY = state.targetY;
+			} else {
+				let lerpFactor;
+				if (dist < 5) {
+					lerpFactor = 0.12;
+				} else if (dist < 30) {
+					lerpFactor = 0.18;
+				} else if (dist < 100) {
+					lerpFactor = 0.28;
+				} else if (dist < 300) {
+					lerpFactor = 0.40;
+				} else {
+					lerpFactor = 0.55;
+				}
+				lerpFactor = 1 - Math.pow(1 - lerpFactor, dt);
+				state.displayX += dx * lerpFactor;
+				state.displayY += dy * lerpFactor;
+			}
+			state.x = state.displayX;
+			state.y = state.displayY;
+			this.players[playerId].x = state.displayX;
+			this.players[playerId].y = state.displayY;
+		}
+	},
+
+	// 计算花瓣的世界坐标
+	getPetalWorldPosition(playerId, petalIndex) {
+const state = this.playerPetalsState[playerId];
+if (!state || !state.petals[petalIndex]) return null;
+const petalState = state.petals[petalIndex];
+return {
+x: state.x + Math.cos(petalState.angle) * petalState.radius,
+y: state.y + Math.sin(petalState.angle) * petalState.radius,
+angle: petalState.angle
+};
 },
 
 getBaseUrl(prefix) {
@@ -530,13 +600,14 @@ closeModal('join-room-modal');
 },
 
 leaveRoom() {
-// 注：由于服务端无显式leave端点，利用5秒心跳超时自动清除退出玩家
+// 注：由于服务端无显式leave端点，利用5秒心跳超时自动清理退出玩家
+this.playerPetalsState = {}; // 清理花瓣状态
 this.resetToSingle();
 },
 
 resetToSingle() {
 this.isMultiplayer = false; this.isHost = false; this.roomCode = ''; this.players = {};
-this.bleedStacks = 0; this.stopSerum(); this.isRoomPaused = false;
+this.clearBleed(); this.stopSerum(); this.isRoomPaused = false;
 clearInterval(this.pollTimer);
 document.getElementById('cheat-review-overlay').style.display = 'none';
 document.getElementById('dynamic-island').style.display = 'none';
@@ -565,24 +636,116 @@ player.x = rand(-100, 100); player.y = rand(-100, 100);
 // 【新增】真实的状态同步函数
 async syncState() {
 if(this.isRoomPaused) return; 
+try {
+// 发送花瓣数据（安全检查）
+const petalsData = (equipped || []).map(p => ({
+type: String(p.type || 'common'),
+kind: String(p.kind || 'melee'),
+x: Number(p.x || 0),
+y: Number(p.y || 0),
+isActive: Boolean(p.isActive)
+}));
 const state = {
 client_id: this.clientId, room_code: this.roomCode,
 x: player.x, y: player.y, 
-hp: player.hp, isBleeding: this.bleedStacks > 0
+hp: player.hp, isBleeding: this.bleedStacks > 0,
+petals: petalsData
 };
-try {
-const res = await fetch(this.serverUrl + '/api/state', { method: 'POST', body: JSON.stringify(state) });
+// 调试日志
+if (window._debug) {
+console.log('发送状态:', state);
+}
+const res = await fetch(this.serverUrl + '/api/state', { 
+method: 'POST', 
+body: JSON.stringify(state),
+signal: AbortController ? new AbortController().signal : undefined
+});
 const data = await res.json();
+// 调试日志
+if (window._debug) {
+console.log('接收数据:', data);
+}
 if(data.success) {
-// 将服务器拉取到的其他玩家位置同步到本地
-this.players = data.players;
+this.players = {};
+const currentTime = Date.now();
+for (const id in data.players) {
+const p = data.players[id];
+if (id === this.clientId) {
+const serverHp = Number(p.hp || player.hp);
+if (serverHp < player.hp) {
+player.hp = serverHp; player.hurtFlashTimer = 5;
+}
+if (Boolean(p.isBleeding) && this.bleedStacks === 0) {
+this.addBleed(1);
+}
+needsUIRender = true;
+continue;
+}
+this.players[id] = {
+x: Number(p.x || 0),
+y: Number(p.y || 0),
+hp: Number(p.hp || 100),
+isBleeding: Boolean(p.isBleeding),
+name: String(p.name || 'Unknown'),
+petals: (p.petals || []).map(petal => ({
+type: String(petal.type || 'common'),
+kind: String(petal.kind || 'melee'),
+isActive: Boolean(petal.isActive)
+})).slice(0, 100)
+};
+// 初始化或更新花瓣动态状态
+			if (!this.playerPetalsState[id]) {
+				this.playerPetalsState[id] = {
+					petals: [],
+					lastUpdateTime: currentTime,
+					baseRotationSpeed: 0.035, // 默认旋转速度
+					displayX: Number(p.x || 0),
+					displayY: Number(p.y || 0),
+					targetX: Number(p.x || 0),
+					targetY: Number(p.y || 0)
+				};
+			}
+			const state = this.playerPetalsState[id];
+			const prevTargetX = state.targetX;
+			const prevTargetY = state.targetY;
+			state.targetX = this.players[id].x;
+			state.targetY = this.players[id].y;
+			if (state.displayX === undefined) {
+				state.displayX = state.targetX;
+				state.displayY = state.targetY;
+			}
+			const timeDelta = (currentTime - state.lastUpdateTime) / 1000;
+			if (timeDelta > 0 && timeDelta < 1) {
+				state.velocityX = (state.targetX - prevTargetX) / timeDelta;
+				state.velocityY = (state.targetY - prevTargetY) / timeDelta;
+			}
+			state.x = state.targetX;
+			state.y = state.targetY;
+			state.lastUpdateTime = currentTime;
+// 同步花瓣数量
+const targetPetalsCount = this.players[id].petals.length;
+if (state.petals.length !== targetPetalsCount) {
+// 重建花瓣状态数组
+state.petals = [];
+for (let i = 0; i < targetPetalsCount; i++) {
+const baseAngle = (Math.PI * 2 / Math.max(1, targetPetalsCount)) * i;
+state.petals.push({
+angle: baseAngle,
+currentSpeed: state.baseRotationSpeed,
+targetSpeed: state.baseRotationSpeed,
+radius: 45 + (targetPetalsCount * 1.5) // 基础半径
+});
+}
+}
+}
 document.getElementById('di-count').innerText = Object.keys(this.players).length + 1;
 } else {
-// 房间不存在或已被解散
 alert("房间已断开连接！");
 this.leaveRoom();
 }
-} catch(e) {}
+} catch(e) {
+console.warn("Sync state error:", e);
+}
 },
 
 startSerum() { if(!this.isInjecting && this.bleedStacks > 0) { this.isInjecting = true; this.serumProgress = 0; document.getElementById('serum-container').style.display='flex'; } },
@@ -595,17 +758,48 @@ document.getElementById('serum-bar-fill').style.width = pct + '%';
 document.getElementById('serum-text').innerText = `注射中 ${Math.floor(pct)}% · 移速降低20%`;
 spawnParticles(player.x, player.y, '#22c55e', 1, 0.5); 
 if(this.serumProgress >= 3000) {
-this.bleedStacks = 0; this.stopSerum();
+this.clearBleed(); this.stopSerum();
 spawnDamageText(player.x, player.y - 20, "流血已解除", "#22c55e");
 }
 },
+addBleed(stacks) {
+if (!this.isMultiplayer) return;
+if (this.bleedStacks === 0) this.bleedStartTime = Date.now();
+this.bleedStacks += stacks;
+},
+clearBleed() {
+this.bleedStacks = 0; this.bleedStartTime = 0; this.lastBleedTick = 0;
+},
 applyBleed() {
-if(this.bleedStacks > 0 && frame % Math.max(10, 60 - this.bleedStacks*10) === 0) { 
+if(this.bleedStacks <= 0) return;
+var now = Date.now();
+var elapsed = (now - this.bleedStartTime) / 1000;
+var dmgPerSec = 1 + Math.floor(elapsed / 5);
+var interval = Math.max(1, Math.floor(60 / dmgPerSec));
+if (frame - this.lastBleedTick >= interval) {
+this.lastBleedTick = frame;
 player.hp -= 1; player.hurtFlashTimer = 5;
-spawnDamageText(player.x, player.y, "-1", "#dc2626");
+spawnDamageText(player.x, player.y, "-1 \u6d41\u8840", "#dc2626");
+spawnParticles(player.x, player.y, '#991b1b', 1, 0.3);
 if(player.hp <= 0) gameOver(true);
 needsUIRender = true;
 }
+},
+sendDamageToServer(targetClientId, damage, isBleedAttack, duration) {
+if(!this.isMultiplayer || !this.serverUrl) return;
+var payload = {
+client_id: this.clientId,
+room_code: this.roomCode,
+target_id: targetClientId,
+damage: damage,
+is_bleed_attack: !!isBleedAttack,
+duration: duration || 0
+};
+fetch(this.serverUrl + '/api/damage', {
+method: 'POST',
+headers: {'Content-Type':'application/json'},
+body: JSON.stringify(payload)
+}).catch(function(){});
 },
 
 initialRatio: window.devicePixelRatio,
@@ -622,7 +816,7 @@ this.initialRatio = window.devicePixelRatio;
 revive() {
 document.getElementById('multiplayerRevive').classList.remove('visible');
 player.x = 0; player.y = 0; player.hp = player.maxHp = 100; player.lvl = 1; player.xp = 0;
-this.bleedStacks = 0; this.stopSerum(); resetInventory();
+this.clearBleed(); this.stopSerum(); resetInventory();
 for(let id in this.players) { if(dist(player, this.players[id]) < 40) player.x += rand(50, 100); }
 isPaused = false; running = true; loop();
 }
@@ -658,11 +852,30 @@ s.title = `品质: ${TIER_NAMES[p.type]}\n耐久: ${p.durability}/${p.maxDurabil
 s.onmousedown = (e) => { if(shiftPressed) quickSwap(p, 'equip'); else startDrag(e, p, 'equip'); };
 eqFrag.appendChild(s);
 }); eqGrid.appendChild(eqFrag);
+// 装备栏超过68个时锁定高度并启用滚动
+const eqWrapper = document.getElementById('equip-wrapper');
+if (!equipCollapsed) {
+  if (equipped.length > 68) {
+    const items = eqGrid.children;
+    if (items.length >= 68) {
+      const item = items[67];
+      const gridTop = eqGrid.getBoundingClientRect().top;
+      const itemBottom = item.getBoundingClientRect().bottom;
+      const lockedH = Math.round(itemBottom - gridTop) + 4;
+      eqWrapper.style.maxHeight = lockedH + 'px';
+      eqWrapper.classList.add('scrollable');
+    }
+  } else {
+    eqWrapper.style.maxHeight = '500px';
+    eqWrapper.classList.remove('scrollable');
+  }
+}
 
 if(activeModal === 'inventory-modal') {
 const invGrid = document.getElementById('inv-grid'); invGrid.innerHTML = '';
 const counts = {}; inventory.forEach(p => counts[p.type+'|'+p.kind] = (counts[p.type+'|'+p.kind]||0)+1);
-Object.keys(counts).forEach(key => {
+const KIND_ORDER = { melee:0, explosive:1, missile:2, speed:3, guardian:4 };
+Object.keys(counts).sort((a,b)=>{ const [ta,ka]=a.split('|'), [tb,kb]=b.split('|'); const td=TIERS.indexOf(ta)-TIERS.indexOf(tb); return td!==0?td:(KIND_ORDER[ka]||0)-(KIND_ORDER[kb]||0); }).forEach(key => {
 const [tier, kind] = key.split('|'); const count = counts[key];
 const el = document.createElement('div'); const col = TIER_COLORS[tier];
 el.style.cssText = `background:${col}; border:2px solid rgba(255,255,255,0.3); border-radius:8px; width:42px; height:42px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; color:#000; position:relative; cursor:grab;`;
@@ -686,11 +899,11 @@ btn.onclick = () => craft(t); panel.appendChild(btn);
 function quickSwap(p, src) { const sArr=src==='equip'?equipped:inventory, dArr=src==='equip'?inventory:equipped; const i=sArr.indexOf(p); if(i>-1 && (src==='equip' || dArr.length<maxEquipLimit)) { sArr.splice(i,1); dArr.push(p); needsUIRender=true; } }
 function quickSwapByKey(k, src) { if(src==='inv' && equipped.length<maxEquipLimit) { const [t, kd]=k.split('|'), i=inventory.findIndex(p=>p.type===t&&p.kind===kd); if(i>-1) { equipped.push(inventory.splice(i,1)[0]); needsUIRender=true; } } }
 let dragData = null, ghost = document.getElementById('drag-ghost');
-function startDragByKey(e, k) { e.preventDefault(); const [t, kd]=k.split('|'), i=inventory.findIndex(p=>p.type===t&&p.kind===kd); if(i===-1) return; dragData = { petal: inventory.splice(i,1)[0], source: 'inv' }; setupDragGhost(e, dragData.petal); }
-function startDrag(e, p, src) { e.preventDefault(); dragData = { petal: p, source: src }; const arr = src==='equip'?equipped:inventory, idx=arr.indexOf(p); if(idx>-1) arr.splice(idx,1); setupDragGhost(e, p); }
+function startDragByKey(e, k) { e.preventDefault(); const [t, kd]=k.split('|'), i=inventory.findIndex(p=>p.type===t&&p.kind===kd); if(i===-1) return; dragData = { petal: inventory.splice(i,1)[0], source: 'inv', originalIndex: i }; setupDragGhost(e, dragData.petal); }
+function startDrag(e, p, src) { e.preventDefault(); dragData = { petal: p, source: src }; const arr = src==='equip'?equipped:inventory, idx=arr.indexOf(p); if(idx>-1) { dragData.originalIndex = idx; arr.splice(idx,1); } setupDragGhost(e, p); }
 function setupDragGhost(e, p) { ghost.className = p.type==='mythic'?'mythic-bg':''; ghost.style.background = p.type==='mythic'?'':TIER_COLORS[p.type]; ghost.innerHTML = `${p.dmg}`; ghost.style.display='flex'; ghost.style.left=e.clientX-19+'px'; ghost.style.top=e.clientY-19+'px'; window.addEventListener('mousemove', onDrag); window.addEventListener('mouseup', endDrag); needsUIRender=true; }
 function onDrag(e) { ghost.style.left=e.clientX-19+'px'; ghost.style.top=e.clientY-19+'px'; }
-function endDrag(e) { ghost.style.display='none'; window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', endDrag); if(!dragData) return; const target=document.elementFromPoint(e.clientX, e.clientY); let droppedInEquip=false; const eqSlots=document.getElementById('equip-grid').children, eqW=document.getElementById('equip-wrapper'); for(let s of eqSlots) if(s.contains(target)||s===target) droppedInEquip=true; if(eqW && (eqW.contains(target)||eqW===target)) droppedInEquip=true; if(droppedInEquip && equipped.length<maxEquipLimit) equipped.push(dragData.petal); else inventory.push(dragData.petal); dragData=null; needsUIRender=true; }
+function endDrag(e) { ghost.style.display='none'; window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', endDrag); if(!dragData) return; const target=document.elementFromPoint(e.clientX, e.clientY); let droppedInEquip=false; const eqSlots=document.getElementById('equip-grid').children, eqW=document.getElementById('equip-wrapper'); for(let s of eqSlots) if(s.contains(target)||s===target) droppedInEquip=true; if(eqW && (eqW.contains(target)||eqW===target)) droppedInEquip=true; if(droppedInEquip && equipped.length<maxEquipLimit) { if(dragData.source==='equip' && dragData.originalIndex!=null) equipped.splice(Math.min(dragData.originalIndex, equipped.length), 0, dragData.petal); else equipped.push(dragData.petal); } else { if(dragData.source==='inv' && dragData.originalIndex!=null) inventory.splice(Math.min(dragData.originalIndex, inventory.length), 0, dragData.petal); else inventory.push(dragData.petal); } dragData=null; needsUIRender=true; }
 function craft(t) { const i=TIERS.indexOf(t); if(i>=TIERS.length-1) return; const count=inventory.filter(p=>p.type===t).length; if(count<5) return; let rm=0; for(let j=inventory.length-1; j>=0&&rm<5; j--) if(inventory[j].type===t) { inventory.splice(j,1); rm++; } if(Math.random()<CRAFT_RATES[t]) inventory.push(createPetal(TIERS[i+1])); else for(let k=0;k<Math.floor(rand(1,5));k++) inventory.push(createPetal(t)); needsUIRender=true; }
 
 // 开发者模式
@@ -710,14 +923,26 @@ enemies.push({ id: Math.random(), x: player.x+Math.cos(angle)*sd, y: player.y+Ma
 }
 
 // ==================== 核心游戏循环 ====================
+let lastFrameTime = Date.now();
 function loop() {
 if(!running) return; requestAnimationFrame(loop);
+
+const now = Date.now();
+const dt = Math.min((now - lastFrameTime) / 16.67, 3); // 时间增量，避免大跳跃
+lastFrameTime = now;
+
 if (needsUIRender) { renderUINow(); needsUIRender = false; }
 
 const dx = mouseX - canvas.width/2, dy = mouseY - canvas.height/2, mDist = Math.hypot(dx, dy);
 
 if (!isPaused && !LAN.isRoomPaused) {
 frame++;
+
+// 更新队友花瓣状态（本地轨道计算）
+		if(LAN.isMultiplayer) {
+			LAN.updatePetalsState(dt);
+			LAN.updatePlayerInterpolation(dt);
+		}
 
 // 血清与流血
 if(LAN.isMultiplayer) {
@@ -737,7 +962,7 @@ for(let i=blastWaves.length-1; i>=0; i--) { let b=blastWaves[i]; b.radius+=(b.ma
 
 // 玩家移动与状态
 let speedMultiSum = equipped.reduce((s,p)=>s+TIER_STATS[p.type].speedBonus,0), avgSpeedBonus = equipped.length ? speedMultiSum/equipped.length : 1;
-const rot = (0.035 + player.lvl*0.0015) * avgSpeedBonus;
+const rot = 0.035 * avgSpeedBonus;
 let speedPetalBoost = 0; equipped.forEach(p=>{ if(p.kind==='speed') speedPetalBoost += p.isActive?0.05:0.15; });
 let targetRadiusOffset = 0, currentSpeedCap = 3.5 * avgSpeedBonus * (1 + speedPetalBoost) * sessionSpeedMult; 
 if(LAN.isInjecting) currentSpeedCap *= 0.8; // 联机注射减速
@@ -745,7 +970,7 @@ if(LAN.isInjecting) currentSpeedCap *= 0.8; // 联机注射减速
 let dmgMult = 1.0 * sessionDmgMult;
 if (isLeftMouseDown) { currentSpeedCap*=1.25; targetRadiusOffset=25; } else if (isRightMouseDown) { targetRadiusOffset=-15; dmgMult*=1.3; }
 currentRadiusOffset += (targetRadiusOffset - currentRadiusOffset) * 0.15;
-let pRadius = Math.max(25, 45 + player.lvl * 4 + currentRadiusOffset);
+let pRadius = Math.max(25, 45 + Math.min(equipped.length * 1.5, 40) + currentRadiusOffset);
 
 if(mDist > 15) { const a = Math.atan2(dy, dx); const accel = currentSpeedCap * 0.15; player.vx+=Math.cos(a)*accel; player.vy+=Math.sin(a)*accel; }
 player.vx*=0.87; player.vy*=0.87;
@@ -826,21 +1051,43 @@ if(e.hp <= 0) { died = true; break; }
 }
 }
 
-// 联机友伤 (花瓣打人)
+// 联机友伤 (花瓣打人) - 仅对玩家生效，不影响怪物
 if(LAN.isMultiplayer) {
-Object.values(LAN.players).forEach(other => {
-if(!other.isAlive) return;
-for(let p of equipped) {
-if(p.isActive && dist(p, other) < p.r + 18) { // 命中他人
-let actualDmg = p.dmg * dmgMult;
-if(p.kind === 'missile' && p.missileState === 'flying') { actualDmg = p.dmg; /* 不秒杀但加流血 */ LAN.bleedStacks++; }
+if(!LAN._ffCooldown) LAN._ffCooldown = {};
+var ffNow = Date.now();
+var playerIds = Object.keys(LAN.players);
+for (var pi = 0; pi < playerIds.length; pi++) {
+var playerId = playerIds[pi];
+var other = LAN.players[playerId];
+if(other.hp !== undefined && other.hp <= 0) continue;
+for(var pi2 = 0; pi2 < equipped.length; pi2++) {
+var p = equipped[pi2];
+if(p.isActive && dist(p, other) < p.r + 18) {
+var cdKey = p.id + '|' + playerId;
+if (LAN._ffCooldown[cdKey] && (now - LAN._ffCooldown[cdKey]) < 300) continue;
+LAN._ffCooldown[cdKey] = now;
+
+var ffDmg = TIER_STATS[p.type].ffDmg;
+var isMissileFlying = p.kind === 'missile' && p.missileState === 'flying';
+var isSlashActive = isLeftMouseDown;
+var isBleedHit = isMissileFlying && isSlashActive;
+
+other.hp -= ffDmg;
+LAN.sendDamageToServer(playerId, ffDmg, isBleedHit, 5);
+
+if(isBleedHit) {
+LAN.addBleed(1);
+spawnDamageText(other.x, other.y, '-' + ffDmg + ' \u6d41\u8840', '#991b1b');
+} else {
+spawnDamageText(other.x, other.y, '-' + ffDmg, '#ff6600');
+}
+
 p.durability -= 1;
 if(p.durability <= 0) { p.isActive = false; p.cooldownTimer = TIER_STATS[p.type].regen; }
 spawnParticles(other.x, other.y, getPetalColor(p.type), 3);
-// 实际应该发DamageEvent告知服务端扣其血，演示省略。
 }
 }
-});
+}
 }
 
 if(died) {
@@ -928,19 +1175,52 @@ ctx.fillStyle='#0f172a'; ctx.fillRect(e.x-12,e.y-e.r-8,24,4); ctx.fillStyle='#22
 });
 // 渲染联机玩家
 if(LAN.isMultiplayer) {
-Object.values(LAN.players).forEach(other => {
-if(!other.isAlive) return;
-// 画他人的花瓣 (简化)
-other.petals.forEach((p,i) => {
-ctx.fillStyle = getPetalColor(p.type, i*20); ctx.globalAlpha = p.isActive?1.0:0.3;
-ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='#fff'; ctx.stroke();
+for (const playerId in LAN.players) {
+const other = LAN.players[playerId];
+if(other.hp !== undefined && other.hp <= 0) continue; 
+const petalsState = LAN.playerPetalsState[playerId];
+// 画他人的花瓣
+if (petalsState && petalsState.petals.length > 0) {
+petalsState.petals.forEach((petalState, i) => {
+const petalData = other.petals[i];
+if (!petalData) return;
+// 计算世界坐标
+const pos = LAN.getPetalWorldPosition(playerId, i);
+if (!pos) return;
+if(!petalData.isActive) {
+// 非活动花瓣显示
+ctx.globalAlpha=0.25;
+ctx.strokeStyle='#64748b';
+ctx.lineWidth=2;
+ctx.setLineDash([4,4]);
+ctx.beginPath();
+ctx.ellipse(pos.x, pos.y, 10, 6, pos.angle, 0, Math.PI*2);
+ctx.stroke();
+ctx.setLineDash([]);
+ctx.globalAlpha=1;
+} else {
+// 活动花瓣显示
+const grad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 10);
+grad.addColorStop(0, '#ffffff');
+grad.addColorStop(1, getPetalColor(petalData.type || 'common', i * 20));
+ctx.fillStyle = grad;
+ctx.globalAlpha = 0.8;
+ctx.beginPath();
+ctx.ellipse(pos.x, pos.y, 10, 6, pos.angle, 0, Math.PI*2);
+ctx.fill();
+ctx.strokeStyle='#fff';
+ctx.lineWidth=1.5;
+ctx.stroke();
+ctx.globalAlpha=1;
+}
 });
+}
 ctx.globalAlpha=1;
 ctx.fillStyle = other.isBleeding ? '#dc2626' : '#a855f7';
 ctx.beginPath(); ctx.arc(other.x, other.y, 18, 0, Math.PI*2); ctx.fill();
 ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
 ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign='center'; ctx.fillText(other.name, other.x, other.y - 25);
-});
+}
 }
 equipped.forEach((p, i)=>{
 if(!p.isActive && p.kind !== 'missile') { ctx.globalAlpha=0.25; ctx.strokeStyle='#64748b'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.ellipse(p.x,p.y,10,6,Math.atan2(p.y-player.y,p.x-player.x),0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; return; }
@@ -965,6 +1245,20 @@ ctx.lineWidth = 3; ctx.stroke();
 // 中心花蕊：注射血清时变绿，否则标准黄色
 ctx.fillStyle = LAN.isInjecting ? '#4ade80' : '#fef08a';
 ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI*2); ctx.fill();
+if(LAN.bleedStacks > 0) {
+ctx.strokeStyle = 'rgba(220, 38, 38, 0.7)';
+ctx.lineWidth = 3;
+ctx.beginPath(); ctx.arc(0, 0, player.r + 4, 0, Math.PI*2); ctx.setLineDash([6, 4]); ctx.lineDashOffset = -frame * 2; ctx.stroke(); ctx.setLineDash([]);
+var bleedDripCount = Math.min(LAN.bleedStacks, 5);
+for(var bd = 0; bd < bleedDripCount; bd++) {
+var dripAngle = (frame * 0.05 + bd * Math.PI * 2 / bleedDripCount) % (Math.PI * 2);
+var dripDist = player.r + 8 + Math.sin(frame * 0.1 + bd) * 6;
+ctx.fillStyle = '#991b1b';
+ctx.globalAlpha = 0.5 + Math.sin(frame * 0.15 + bd) * 0.3;
+ctx.beginPath(); ctx.arc(Math.cos(dripAngle) * dripDist, Math.sin(dripAngle) * dripDist, 3, 0, Math.PI*2); ctx.fill();
+}
+ctx.globalAlpha = 1;
+}
 ctx.restore();
 // 渲染死亡粒子
 particles.forEach(p=>{ ctx.globalAlpha=p.life/35; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); });

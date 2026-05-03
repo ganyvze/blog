@@ -1,7 +1,7 @@
 ---
 title: florr.oi联机服务端
 published: 2026-01-09
-description: "v1.1"
+description: "v2.0"
 image: "./cover.jpeg"
 tags: ["C++"]
 category: 程序
@@ -9,7 +9,7 @@ draft: false
 ---
 
 ```cpp
-//florr.oi联机服务端 - v1.1
+//florr.oi 联机服务端 - v2.0
 #include <iostream>
 #include <string>
 #include <thread>
@@ -23,7 +23,7 @@ draft: false
 
 using namespace std;
 
-// --- 动态加载 ws2_32.dll ---
+// --- Dynamic Load ws2_32.dll ---
 typedef int(WSAAPI *P_WS)(WORD, LPWSADATA);
 typedef int(WSAAPI *P_WC)(void);
 typedef SOCKET(WSAAPI *P_SK)(int, int, int);
@@ -68,13 +68,21 @@ struct API_HUB {
     }
 } API;
 
-// --- 数据结构 ---
+// --- Data Structures ---
+struct Petal {
+    string type; // common, unusual, rare, epic, legendary, mythic
+    string kind; // melee, explosive, missile, speed, guardian
+    double x = 0, y = 0;
+    bool isActive = true;
+};
+
 struct Player {
     string id, name;
     double x = 0, y = 0, hp = 100, maxHp = 100;
     int lvl = 1;
     bool isAlive = true, isBleeding = false;
     long long lastHeartbeat = 0;
+    vector<Petal> petals;
 };
 
 struct Room {
@@ -87,8 +95,9 @@ struct Room {
 
 map<string, Room> rooms;
 mutex roomMutex;
+map<string, long long> lastDamageTime; // key = attackerId|targetId, cooldown tracker
 
-// --- 工具函数：提取简易JSON字段 ---
+// --- Utility: Simple JSON Field Extraction ---
 string getJsonString(const string& json, const string& key) {
     size_t pos = json.find("\"" + key + "\":");
     if (pos == string::npos) return "";
@@ -120,14 +129,83 @@ bool getJsonBool(const string& json, const string& key) {
     return (json.substr(pos, 4) == "true");
 }
 
+vector<Petal> getJsonPetals(const string& json) {
+    vector<Petal> petals;
+    // Find the start of the petals array
+    size_t petalsPos = json.find("\"petals\":");
+    if (petalsPos == string::npos) return petals;
+    
+    // Find the [ position
+    size_t arrStart = json.find('[', petalsPos);
+    if (arrStart == string::npos) return petals;
+    
+    // Find the matching ], handling nesting
+    int depth = 1;
+    size_t i = arrStart + 1;
+    while (i < json.length() && depth > 0) {
+        if (json[i] == '[') depth++;
+        else if (json[i] == ']') depth--;
+        i++;
+    }
+    
+    if (depth > 0) return petals;
+    
+    size_t arrEnd = i - 1;
+    string petalsStr = json.substr(arrStart + 1, arrEnd - arrStart - 1);
+    if (petalsStr.empty()) return petals;
+    
+    // Parse each petal object
+    size_t pos = 0;
+    while (pos < petalsStr.length()) {
+        // Skip whitespace
+        while (pos < petalsStr.length() && (petalsStr[pos] == ' ' || petalsStr[pos] == '\t' || petalsStr[pos] == '\n' || petalsStr[pos] == '\r' || petalsStr[pos] == ',')) {
+            pos++;
+        }
+        
+        if (pos >= petalsStr.length()) break;
+        if (petalsStr[pos] != '{') break;
+        
+        // Find the matching }
+        int objDepth = 1;
+        size_t objEnd = pos + 1;
+        while (objEnd < petalsStr.length() && objDepth > 0) {
+            if (petalsStr[objEnd] == '{') objDepth++;
+            else if (petalsStr[objEnd] == '}') objDepth--;
+            objEnd++;
+        }
+        
+        if (objDepth > 0) break;
+        
+        string petalObj = petalsStr.substr(pos, objEnd - pos);
+        Petal p;
+        p.type = getJsonString(petalObj, "type");
+        p.kind = getJsonString(petalObj, "kind");
+        p.x = getJsonDouble(petalObj, "x");
+        p.y = getJsonDouble(petalObj, "y");
+        p.isActive = getJsonBool(petalObj, "isActive");
+        petals.push_back(p);
+        
+        pos = objEnd;
+    }
+    
+    return petals;
+}
+
 long long getTimestamp() {
-    // 获取当前时间戳（毫秒）
+    // Get current timestamp in milliseconds
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()
     ).count();
 }
 
-// --- HTTP 响应构造 ---
+// --- Compact double formatting (Bug3 fix: to_string produces redundant precision e.g. 100.000000) ---
+string fmtDouble(double v) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.2f", v);
+    return buf;
+}
+
+// --- HTTP Response Builder ---
 void sendHttpResponse(SOCKET clientSocket, const string& jsonBody) {
     string response = "HTTP/1.1 200 OK\r\n"
                       "Content-Type: application/json; charset=utf-8\r\n"
@@ -138,7 +216,7 @@ void sendHttpResponse(SOCKET clientSocket, const string& jsonBody) {
     API.sd(clientSocket, response.c_str(), (int)response.length(), 0);
 }
 
-// --- 处理客户端 HTTP 请求 ---
+// --- Client HTTP Request Handler ---
 void handleClient(SOCKET clientSocket) {
     char buffer[4096] = {0};
     API.rcv(clientSocket, buffer, (int)sizeof(buffer) - 1, 0);
@@ -157,8 +235,14 @@ void handleClient(SOCKET clientSocket) {
         string clientId = getJsonString(body, "client_id");
         string name = getJsonString(body, "name");
         
+        srand((unsigned int)GetTickCount() ^ (unsigned int)GetCurrentThreadId());
+
         lock_guard<mutex> lock(roomMutex);
-        string code = to_string(100000 + rand() % 900000); 
+        
+        string code;
+        do {
+            code = to_string(100000 + rand() % 900000); 
+        } while (rooms.count(code) > 0);
         Room r; r.code = code; r.hostId = clientId; r.hostName = name;
         Player p; p.id = clientId; p.name = name; p.lastHeartbeat = getTimestamp();
         r.players[clientId] = p;
@@ -177,7 +261,7 @@ void handleClient(SOCKET clientSocket) {
             rooms[code].players[clientId] = p;
             sendHttpResponse(clientSocket, "{\"success\":true}");
         } else {
-            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"房间不存在或已满\"}");
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Room not found or full\"}");
         }
     }
     else if (request.find("GET /api/room/list") != string::npos) { 
@@ -199,20 +283,53 @@ void handleClient(SOCKET clientSocket) {
         lock_guard<mutex> lock(roomMutex);
         if (rooms.count(code)) {
             auto& p = rooms[code].players[clientId];
-            p.x = getJsonDouble(body, "x"); p.y = getJsonDouble(body, "y");p.hp = getJsonDouble(body, "hp");
+            p.x = getJsonDouble(body, "x"); 
+            p.y = getJsonDouble(body, "y");
+            double reportedHp = getJsonDouble(body, "hp");
+            if (reportedHp <= p.hp || p.hp > p.maxHp) {
+                p.hp = reportedHp;
+            }
             p.isBleeding = getJsonBool(body, "isBleeding");
+            p.petals = getJsonPetals(body);
             p.lastHeartbeat = getTimestamp();
 
             string res = "{\"success\":true, \"isPaused\":" + string(rooms[code].isPaused ? "true" : "false") + ", \"players\":{";
             bool first = true;
+            {
+                res += "\"" + clientId + "\":{";
+                res += "\"x\":" + fmtDouble(p.x) + ",\"y\":" + fmtDouble(p.y);
+                res += ",\"hp\":" + fmtDouble(p.hp) + ",\"isBleeding\":" + (p.isBleeding ? "true" : "false");
+                res += ",\"isAlive\":true,\"name\":\"" + p.name + "\"";
+                res += ",\"petals\":[";
+                bool firstPetal2 = true;
+                for (auto& petal : p.petals) {
+                    if (!firstPetal2) res += ",";
+                    res += "{\"type\":\"" + petal.type + "\",\"kind\":\"" + petal.kind + "\"";
+                    res += ",\"isActive\":" + string(petal.isActive ? "true" : "false") + "}";
+                    firstPetal2 = false;
+                }
+                res += "]}";
+                first = false;
+            }
             for (auto& other : rooms[code].players) {
                 if (other.first == clientId) continue; 
                 if (getTimestamp() - other.second.lastHeartbeat > 5000) continue; 
                 
                 if (!first) res += ",";
-                res += "\"" + other.first + "\":{\"x\":" + to_string(other.second.x) + ",\"y\":" + to_string(other.second.y) + 
-                       ",\"hp\":" + to_string(other.second.hp) + ",\"isBleeding\":" + (other.second.isBleeding ? "true" : "false") + 
-                       ",\"name\":\"" + other.second.name + "\"}";
+                res += "\"" + other.first + "\":{";
+                res += "\"x\":" + fmtDouble(other.second.x) + ",\"y\":" + fmtDouble(other.second.y);
+                res += ",\"hp\":" + fmtDouble(other.second.hp) + ",\"isBleeding\":" + (other.second.isBleeding ? "true" : "false");
+                res += ",\"isAlive\":true,\"name\":\"" + other.second.name + "\"";
+                res += ",\"petals\":[";
+                bool firstPetal2 = true;
+                for (auto& petal : other.second.petals) {
+                    if (!firstPetal2) res += ",";
+                    res += "{\"type\":\"" + petal.type + "\",\"kind\":\"" + petal.kind + "\"";
+                    res += ",\"isActive\":" + string(petal.isActive ? "true" : "false") + "}";
+                    firstPetal2 = false;
+                }
+                res += "]";
+                res += "}";
                 first = false;
             }
             res += "}}";
@@ -221,10 +338,91 @@ void handleClient(SOCKET clientSocket) {
             sendHttpResponse(clientSocket, "{\"success\":false}");
         }
     }
+    else if (request.find("POST /api/damage") != string::npos) {
+        string clientId = getJsonString(body, "client_id");
+        string roomCode = getJsonString(body, "room_code");
+        string targetId = getJsonString(body, "target_id");
+        double damage = getJsonDouble(body, "damage");
+        bool isBleedAttack = getJsonBool(body, "is_bleed_attack");
+        int duration = (int)getJsonDouble(body, "duration");
+
+        if (clientId.empty() || roomCode.empty() || targetId.empty()) {
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Bad request: missing required fields (client_id/room_code/target_id)\"}");
+            cout << "[ERROR] /api/damage: missing required fields" << endl;
+            API.cs(clientSocket);
+            return;
+        }
+        if (damage < 0 || damage > 1000) {
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Invalid damage value, range must be 0-1000\"}");
+            cout << "[ERROR] /api/damage: invalid damage value (" << damage << ")" << endl;
+            API.cs(clientSocket);
+            return;
+        }
+
+        lock_guard<mutex> lock(roomMutex);
+        if (rooms.count(roomCode) == 0) {
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Target room not found\"}");
+            cout << "[ERROR] /api/damage: room " << roomCode << " not found" << endl;
+            API.cs(clientSocket);
+            return;
+        }
+
+        Room& room = rooms[roomCode];
+        if (room.players.count(targetId) == 0) {
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Target player not found or offline\"}");
+            cout << "[ERROR] /api/damage: target player " << targetId << " not found in room " << roomCode << endl;
+            API.cs(clientSocket);
+            return;
+        }
+
+        if (room.players.count(clientId) == 0) {
+            sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Attacker not in target room\"}");
+            cout << "[ERROR] /api/damage: attacker " << clientId << " not in room " << roomCode << endl;
+            API.cs(clientSocket);
+            return;
+        }
+
+        Player& target = room.players[targetId];
+        {
+            string cooldownKey = clientId + "|" + targetId;
+            long long nowMs = getTimestamp();
+            auto it = lastDamageTime.find(cooldownKey);
+            if (it != lastDamageTime.end() && (nowMs - it->second) < 500) {
+                sendHttpResponse(clientSocket, "{\"success\":false, \"message\":\"Damage cooldown: 500ms limit per attacker-target pair\"}");
+                cout << "[DAMAGE] cooldown: " << clientId << " -> " << targetId
+                     << " skipped (" << (nowMs - it->second) << "ms since last hit)" << endl;
+                API.cs(clientSocket);
+                return;
+            }
+            lastDamageTime[cooldownKey] = nowMs;
+        }
+        target.hp -= damage;
+        if (target.hp < 0) target.hp = 0;
+
+        if (isBleedAttack) {
+            target.isBleeding = true;
+            if (duration <= 0) duration = 5;
+            //cout << "[DAMAGE] room:" << roomCode
+            //     << " | attacker:" << clientId
+            //     << " -> target:" << targetId
+            //     << " | damage:" << damage
+            //     << " | bleed:yes (duration " << duration << "s)"
+            //     << " | target_HP:" << target.hp << endl;
+        } else {
+            //cout << "[DAMAGE] room:" << roomCode
+            //     << " | attacker:" << clientId
+            //     << " -> target:" << targetId
+            //     << " | damage:" << damage
+            //     << " | bleed:no"
+            //     << " | target_HP:" << target.hp << endl;
+        }
+
+        sendHttpResponse(clientSocket, "{\"success\":true, \"message\":\"Damage applied\", \"target_hp\":" + fmtDouble(target.hp) + ", \"target_bleeding\":" + (target.isBleeding ? "true" : "false") + "}");
+    }
     API.cs(clientSocket);
 }
 
-// --- TCP 监听线程 ---
+// --- TCP Listener Thread ---
 void tcpServer() {
     SOCKET listenSocket = API.sk(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     sockaddr_in serverAddr = {0};
@@ -252,7 +450,7 @@ void tcpServer() {
     }
 }
 
-// --- UDP 广播发现线程 ---
+// --- UDP Beacon Discovery Thread ---
 void udpBeacon() {
     SOCKET udpSocket = API.sk(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     BOOL broadcast = TRUE;
@@ -274,10 +472,10 @@ void udpBeacon() {
 }
 
 int main() {
-    // 1. 先初始化函数指针动态获取
+    // 1. Initialize dynamic function pointers
     API.init();
 
-    // 2. 正常使用底层 API
+    // 2. Use low-level API normally
     WSADATA wsaData;
     API.ws(MAKEWORD(2, 2), &wsaData);
     srand((unsigned int)GetTickCount());
